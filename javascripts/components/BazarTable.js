@@ -20,10 +20,7 @@ let componentParams = {
     },
     template: `
     <div>
-      <template v-if="ready">
-          TEST
-      </template>
-      <spinner-loader v-if="this.$root.isLoading || !ready" class="overlay super-overlay"></spinner-loader>
+      <slot name="base"/>
     </div>
   `
 };
