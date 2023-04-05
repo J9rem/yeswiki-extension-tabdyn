@@ -4,7 +4,7 @@
 
 Extension [YesWiki](https://yeswiki.net/) pour avoir un template bazar tableau dynamic
 
-###Auteurs
+## Auteurs
 
  - Jérémy Dufraisse
  - et tous les contributeurs et toutes les contributrices indiqués sur cette page : <https://github.com/J9rem/yeswiki-extension-tabdyn/graphs/contributors>
