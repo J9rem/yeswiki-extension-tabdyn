@@ -1,0 +1,23 @@
+{# # This file is part of the YesWiki Extension tabdyn.
+# Authors : see README.md file that was distributed with this source code.
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code. 
+#}
+
+{% extends "@bazar/entries/index-dynamic.twig" %}
+
+{% set necessary_fields = [] %}
+
+{% block assets %}
+  {{ include_css('styles/vendor/datatables-full/dataTables.bootstrap.min.css') }}
+  {{ include_css('tools/tabdyn/styles/tabdyn.css') }}
+
+  {{ include_javascript('javascripts/vendor/datatables-full/jquery.dataTables.min.js') }} 
+  {{ include_javascript('tools/tabdyn/javascripts/components/BazarTable.js', false, true) }}
+   
+{% endblock %}
+
+{% block display_entries %}
+  <Bazar-Table :params="params" :entries="entriesToDisplay" :ready="ready" :root="$root" :isadmin="{{ hasAcl("@admins")|json_encode }}">
+  </Bazar-Table>
+{% endblock %}
