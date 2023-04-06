@@ -1,0 +1,17 @@
+# This file is part of the YesWiki Extension tabdyn.
+# Authors : see README.md file that was distributed with this source code.
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code. 
+services:
+  _defaults:
+    autowire: true
+    public: true
+
+  YesWiki\Tabdyn\Service\:
+    resource: 'services/*'
+
+  YesWiki\Tabdyn\Service\ActionsBuilderService:
+    decorates: YesWiki\Aceditor\Service\ActionsBuilderService
+    decoration_on_invalid: null
+    arguments:
+      $parentActionsBuilderService: '@.inner'

@@ -1,0 +1,30 @@
+<?php
+
+/*
+ * This file is part of the YesWiki Extension tabdyn.
+ *
+ * Authors : see README.md file that was distributed with this source code.
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+use YesWiki\Aceditor\Service\ActionsBuilderService;
+
+$actionsBuilderService = $this->wiki->services->get(ActionsBuilderService::class);
+$actionsBuilderService->setPreviousData($data ?? null);
+$data = $actionsBuilderService->getData();
+
+$paths = $this->twigLoader->getPaths("aceditor");
+$curExtDirName = basename(dirname(dirname(dirname(__FILE__))));
+$curDir = "tools/$curExtDirName/templates/aceditor";
+
+// render next following custom actions-builder.tpl.html
+$curPos = array_search($curDir,$paths);
+if ($curPos !== false) {
+    for ($i=($curPos+1); $i < count($paths); $i++) { 
+        if ($paths[$i] != $curDir && $this->hasTemplate("{$paths[$i]}/actions-builder.tpl.html")){
+            echo $this->render("{$paths[$i]}/actions-builder.tpl.html",compact(['data']));
+            break;
+        }
+    }
+}
