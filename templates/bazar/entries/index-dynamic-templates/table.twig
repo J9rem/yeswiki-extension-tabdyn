@@ -19,5 +19,10 @@
 
 {% block display_entries %}
   <Bazar-Table :params="params" :entries="entriesToDisplay" :ready="ready" :root="$root" :isadmin="{{ hasAcl("@admins")|json_encode }}">
+    <template #header="{displayedEntries}"></template>
+    <template #spinnerloader="{displayedEntries}">
+      <spinner-loader v-if="isLoading || !ready" class="overlay super-overlay" :height="500"></spinner-loader>
+    </template>
+    <template #footer="{displayedEntries}"></template>
   </Bazar-Table>
 {% endblock %}

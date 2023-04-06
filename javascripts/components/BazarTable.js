@@ -16,9 +16,10 @@ let componentParams = {
     components: {SpinnerLoader},
     data: function() {
         return {
+            columns: [],
             dataTable: null,
-            isMounted: false,
-            paramsLoaded: false
+            displayedEntries: {},
+            forms: {}
         };
     },
     methods:{
@@ -31,8 +32,50 @@ let componentParams = {
             b.sort()
             return a.every((val,idx)=>a[idx] !== b[idx])
         },
+        extractFormsIds(){
+            return ('id' in this.params) ? this.params.id.split(',') : []
+        },
+        getFormData(formId){
+            if (this.isLocalFormId(formId)){
+                return {
+                    url: wiki.url(`?api/forms/${formId}`),
+                    localFormId: formId
+                }
+            } else {
+                const [baseUrl,rest] = formId.split('|',2)
+                const externalFormId = (rest.match(/^([0-9]+)(?:->[0-9]+)?$/) || ['',''])[1]
+                const localFormId = (rest.match(/^(?:[0-9]+->)([0-9]+)$/)|| ['',''])[1]
+                return {
+                    url: baseUrl+(baseUrl.slice(-1) === '?' ? '' : '?')+`api/forms/${externalFormId}`,
+                    localFormId: (!localFormId || localFormId.length == 0) ? externalFormId : localFormId
+                }
+            }
+        },
+        isLocalFormId(formId){
+            return String(formId) === String(Number(formId)) && formId.slice(0,4) !== 'http'
+        },
+        async loadForm(formId){
+            const {url,localFormId} = this.getFormData(formId)
+            return await fetch(url)
+            .then((response)=>{
+                if (!response.ok){
+                    throw new Error(`Response was not ok when getting ${formId} from ${url}`)
+                }
+                return response.json()
+            })
+            .then((form)=>{
+                this.forms[formId] = {...form,...{localFormId}}
+                return form
+            })
+        },
+        manageError(error){
+            if (wiki.isDebugEnabled){
+                console.error(error)
+            }
+            return null
+        },
         mountTable(){
-            if (this.isMounted && this.dataTable === null && this.paramsLoaded) {
+            if (this.dataTable === null) {
                 this.dataTable = $(this.$refs.dataTable).DataTable({
                     ...DATATABLE_OPTIONS,
                     ...{
@@ -61,13 +104,28 @@ let componentParams = {
                 })
             }
         },
+        updateColumns(form,canInit = false){
+            if (this.columns.length > 0 || canInit){
+
+            }
+        },
+        updateForms(){
+            this.extractFormsIds().forEach((id,idx)=>{
+                if (!(id in this.forms)){
+                    this.forms[id] = {}
+                    this.loadForm(id)
+                        .then((form)=>{
+                            this.updateColumns(form,(idx === 0))
+                        })
+                        .catch(this.manageError)
+                }
+            })
+        }
     },
     mounted(){
         $(isVueJS3 ? this.$el.parentNode : this.$el).on('dblclick',function(e) {
           return false;
         });
-        this.isMounted = true
-        this.mountTable()
     },
     watch: {
         entries(newVal, oldVal) {
@@ -77,14 +135,15 @@ let componentParams = {
           }
         },
         params() {
-            this.paramsLoaded = true
-            this.mountTable()
+            this.updateForms()
         },
     },
     template: `
     <div>
+        <slot name="header" v-bind="{displayedEntries}"/>
         <table ref="dataTable" class="table-striped"></table>
-        <spinner-loader v-if="this.$root.isLoading || !ready" class="overlay super-overlay" :height="500"></spinner-loader>
+        <slot name="spinnerloader" v-bind="{displayedEntries}"/>
+        <slot name="footer" v-bind="{displayedEntries}"/>
     </div>
   `
 };
