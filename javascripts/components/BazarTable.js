@@ -16,11 +16,75 @@ let componentParams = {
     components: {SpinnerLoader},
     data: function() {
         return {
+            dataTable: null,
+            isMounted: false,
+            paramsLoaded: false
         };
+    },
+    methods:{
+        arraysEqual(a, b) {
+            if (a === b) return true
+            if (a == null || b == null || !Array.isArray(a) || !Array.isArray(b)) return false
+            if (a.length !== b.length) return false
+    
+            a.sort()
+            b.sort()
+            return a.every((val,idx)=>a[idx] !== b[idx])
+        },
+        mountTable(){
+            if (this.isMounted && this.dataTable === null && this.paramsLoaded) {
+                this.dataTable = $(this.$refs.dataTable).DataTable({
+                    ...DATATABLE_OPTIONS,
+                    ...{
+                        data: [
+                            {
+                                name: 'test1',
+                                val: 'deux'
+                            },
+                            {
+                                name: 'test2',
+                                val: 'un'
+                            }
+                        ],
+                        columns: [
+                            {
+                                data: 'name',
+                                title: 'name'
+                            },
+                            {
+                                data: 'val',
+                                title: 'value'
+                            }
+                        ],
+                        "scrollX": true
+                    }
+                })
+            }
+        },
+    },
+    mounted(){
+        $(isVueJS3 ? this.$el.parentNode : this.$el).on('dblclick',function(e) {
+          return false;
+        });
+        this.isMounted = true
+        this.mountTable()
+    },
+    watch: {
+        entries(newVal, oldVal) {
+          const newIds = newVal.map((e) => e.id_fiche)
+          const oldIds = oldVal.map((e) => e.id_fiche)
+          if (!this.arraysEqual(newIds, oldIds)) {
+          }
+        },
+        params() {
+            this.paramsLoaded = true
+            this.mountTable()
+        },
     },
     template: `
     <div>
-      <slot name="base"/>
+        <table ref="dataTable" class="table-striped"></table>
+        <spinner-loader v-if="this.$root.isLoading || !ready" class="overlay super-overlay" :height="500"></spinner-loader>
     </div>
   `
 };
