@@ -24,7 +24,8 @@ let componentParams = {
             isReady:{
                 isAdmin: false,
                 params: false
-            }
+            },
+            sumFieldsIds: []
         };
     },
     methods:{
@@ -181,8 +182,10 @@ let componentParams = {
                 listOfResolveReject.forEach(({resolve})=>resolve(name in this ? this[name] : null))
             }
         },
-        async sanitizedParam(name){
-            const params = await this.waitFor('params')
+        async sanitizedParamAsync(name){
+            return await this.sanitizedParam(await this.waitFor('params'),await this.waitFor('isAdmin'),name)
+        },
+        sanitizedParam(params,isAdmin,name){
             switch (name) {
                 case 'displayadmincol':
                 case 'displaycreationdate':
@@ -196,7 +199,7 @@ let componentParams = {
                         : false
                     switch (paramValue) {
                         case 'onlyadmins':
-                            return [1,true,'1','true'].includes(await this.waitFor('isAdmin'))
+                            return [1,true,'1','true'].includes(isAdmin)
                         case 'yes':
                             return true
                         case false:
@@ -317,7 +320,10 @@ let componentParams = {
     template: `
     <div>
         <slot name="header" v-bind="{displayedEntries}"/>
-        <table ref="dataTable" class="table prevent-auto-init table-condensed display"></table>
+        <table ref="dataTable" class="table prevent-auto-init table-condensed display">
+            <tfoot v-if="sumFieldsIds.length > 0 || sanitizedParam(params,isadmin,'displayadmincol')">
+            </tfoot>
+        </table>
         <slot name="spinnerloader" v-bind="{displayedEntries}"/>
         <slot name="footer" v-bind="{displayedEntries}"/>
     </div>
