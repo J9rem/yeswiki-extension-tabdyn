@@ -21,7 +21,10 @@ let componentParams = {
             dataTable: null,
             displayedEntries: {},
             forms: {},
-            paramsReady: false
+            isReady:{
+                isAdmin: false,
+                params: false
+            }
         };
     },
     methods:{
@@ -52,7 +55,7 @@ let componentParams = {
         },
         async getColumns(){
             if (this.columns.length == 0){
-                const params = this.paramsReady ? this.params : await this.waitFor('params')
+                const params = await this.waitFor('params')
                 this.columns = [
                     {
                         data: 'id_fiche',
@@ -169,12 +172,58 @@ let componentParams = {
                 return !('id_fiche' in data) || entryIdsToRemove.includes(data.id_fiche)
             }).remove().draw()
         },
-        resolveParams(){
-            if (this.paramsReady && 'params' in this.cacheResolveReject &&
-                Array.isArray(this.cacheResolveReject.params)){
-                const listOfResolveReject = this.cacheResolveReject.params
-                this.cacheResolveReject.params = []
-                listOfResolveReject.forEach(({resolve})=>resolve(this.params))
+        resolve(name){
+            this.isReady[name] = true
+            if (name in this.cacheResolveReject &&
+                Array.isArray(this.cacheResolveReject[name])){
+                const listOfResolveReject = this.cacheResolveReject[name]
+                this.cacheResolveReject[name] = []
+                listOfResolveReject.forEach(({resolve})=>resolve(name in this ? this[name] : null))
+            }
+        },
+        async sanitizedParam(name){
+            const params = await this.waitFor('params')
+            switch (name) {
+                case 'displayadmincol':
+                case 'displaycreationdate':
+                case 'displaylastchangedate':
+                case 'displayowner':
+                    const paramValue = (
+                            name in params && 
+                            typeof params[name] === 'string' && 
+                            ['yes','onlyadmins'].includes(params[name]))
+                        ? params[name]
+                        : false
+                    switch (paramValue) {
+                        case 'onlyadmins':
+                            return [1,true,'1','true'].includes(await this.waitFor('isAdmin'))
+                        case 'yes':
+                            return true
+                        case false:
+                        default:
+                            return false
+                    }
+                case 'displayvaluesinsteadofkeys':
+                case 'exportallcolumns':
+                case 'displayimagesasthumbnails':
+                    return name in params ? [true,1,'1','true'].includes(params[name]) : false
+                    
+                case 'columnswidth':
+                    const columnswidth = {}
+                    if (
+                        name in params && 
+                        typeof params[name] === 'string'
+                    ) {
+                        params[name].split(',').foreach((extract)=>{
+                            const [name,value] = extract.split('=',2)
+                            if (name && value && name.length > 0 && value.length > 0){
+                                columnswidth[name] = value
+                            }
+                        })
+                    }
+                    return columnswidth
+                default:
+                    return params[name] || null
             }
         },
         sanitizeValue(val) {
@@ -233,6 +282,9 @@ let componentParams = {
             })
         },
         async waitFor(name){
+            if (this.isReady[name]){
+                return this[name] || null
+            }
             if (!(name in this.cacheResolveReject)){
                 this.cacheResolveReject[name] = []
             }
@@ -255,9 +307,11 @@ let componentParams = {
             this.updateEntries(newVal,newIds).catch(this.manageError)
           }
         },
+        isadmin() {
+            this.resolve('isAdmin')
+        },
         params() {
-            this.paramsReady = true
-            this.resolveParams()
+            this.resolve('params')
         },
     },
     template: `
