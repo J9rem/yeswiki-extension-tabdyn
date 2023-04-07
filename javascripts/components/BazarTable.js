@@ -22,21 +22,28 @@ let componentParams = {
             displayedEntries: {},
             forms: {},
             isReady:{
-                isAdmin: false,
+                isadmin: true,
                 params: false
             },
-            sumFieldsIds: []
+            sumFieldsIds: [],
+            uuid: null
         };
     },
     methods:{
-        addRows(dataTable,columns,entries){
+        addRows(dataTable,columns,entries,currentusername,isadmin){
             const entriesToAdd = entries.filter((entry)=>!(entry.id_fiche in this.displayedEntries))
             let formattedDataList = []
             entriesToAdd.forEach((entry)=>{
                 this.displayedEntries[entry.id_fiche] = entry
                 let formattedData = {}
                 columns.forEach((col)=>{
-                    formattedData[col.data] = col.data in entry ? entry[col.data] : ''
+                    if (col.data === '==canDelete=='){
+                        formattedData[col.data] = !this.$root.isExternalUrl(entry) && 
+                            'owner' in entry &&
+                            (isadmin || entry.owner == currentusername)
+                    } else {
+                        formattedData[col.data] = col.data in entry ? entry[col.data] : ''
+                    }
                 })
                 formattedDataList.push(formattedData)
             })
@@ -57,16 +64,27 @@ let componentParams = {
         async getColumns(){
             if (this.columns.length == 0){
                 const params = await this.waitFor('params')
-                this.columns = [
-                    {
-                        data: 'id_fiche',
-                        title: 'id'
-                    },
-                    {
-                        data: 'bf_titre',
-                        title: 'Titre'
-                    }
-                ]
+                const displayadmincol = await this.sanitizedParamAsync('displayadmincol')
+                const columns = []
+                if (displayadmincol){
+                    const uuid = this.getUuid()
+                    columns.push({
+                        data: '==canDelete==',
+                        render: (data,type,row)=>{
+                            return this.getDeleteChekbox(uuid,row.id_fiche,!data)
+                        },
+                        title: this.getDeleteChekboxAll(uuid,'top')
+                    })
+                }
+                columns.push({
+                    data: 'id_fiche',
+                    title: 'id'
+                })
+                columns.push({
+                    data: 'bf_titre',
+                    title: 'Titre'
+                })
+                this.columns = columns
             }
             return this.columns
         },
@@ -120,8 +138,46 @@ let componentParams = {
                 this.dataTable.on('draw', () => {
                     this.updateNBResults()
                 })
+                if (await this.sanitizedParamAsync('displayadmincol')){
+                    this.setCheckBoxAllInFooter()
+                }
             }
             return this.dataTable
+        },
+        getDeleteChekbox(targetId,itemId,disabled = false){
+            const id = `selectline_${targetId}_${itemId}`
+            return `
+                <td>
+                    <label for="${id}">
+                        <input
+                            `+ (disabled
+                            ? 'disabled'
+                            : `class="selectline"
+                               data-itemid="${itemId}"
+                              `
+                            )+`
+                            type="checkbox"
+                            id="${id}" 
+                            name="${id}" 
+                            value="">
+                        <span></span>
+                    </label>
+                </td>
+            `
+        },
+        getDeleteChekboxAll(targetId,selectAllType){
+            return `
+                <th class="prevent-sorting not-export-this-col">
+                    <label class="check-all-container" for="checkbox_checkall_${selectAllType}_${targetId}">
+                    <input
+                        type="checkbox"
+                        id="checkbox_checkall_${selectAllType}_${targetId}" 
+                        name="checkbox_checkall_${selectAllType}_${targetId}" 
+                        value="" onclick="checkAllFirstCol(this)">
+                    <span></span>
+                    </label>
+                </th>
+            `
         },
         getFormData(formId){
             if (this.isLocalFormId(formId)){
@@ -138,6 +194,12 @@ let componentParams = {
                     localFormId: (!localFormId || localFormId.length == 0) ? externalFormId : localFormId
                 }
             }
+        },
+        getUuid(){
+            if (this.uuid === null){
+                this.uuid = crypto.randomUUID()
+            }
+            return this.uuid
         },
         isLocalFormId(formId){
             return String(formId) === String(Number(formId)) && formId.slice(0,4) !== 'http'
@@ -183,7 +245,7 @@ let componentParams = {
             }
         },
         async sanitizedParamAsync(name){
-            return await this.sanitizedParam(await this.waitFor('params'),await this.waitFor('isAdmin'),name)
+            return await this.sanitizedParam(await this.waitFor('params'),await this.waitFor('isadmin'),name)
         },
         sanitizedParam(params,isAdmin,name){
             switch (name) {
@@ -237,6 +299,10 @@ let componentParams = {
           }
           return (isNaN(sanitizedValue)) ? 1 : Number(sanitizedValue)
         },
+        setCheckBoxAllInFooter(){
+            const uuid = this.getUuid()
+            this.dataTable.columns(0).footer().to$().html($(this.getDeleteChekboxAll(uuid,'bottom')).children().first())
+        },
         updateColumns(form,canInit = false){
             if (this.columns.length > 0 || canInit){
 
@@ -245,8 +311,10 @@ let componentParams = {
         async updateEntries(newEntries,newIds){
             const columns = await this.getColumns()
             const dataTable = await this.getDatatable()
+            const currentusername = await this.sanitizedParamAsync('currentusername')
+            const isadmin = await this.waitFor('isadmin')
             this.removeRows(dataTable,newIds)
-            this.addRows(dataTable,columns,newEntries)
+            this.addRows(dataTable,columns,newEntries,currentusername,isadmin)
         },
         updateNBResults(){
             // TODO
@@ -311,7 +379,7 @@ let componentParams = {
           }
         },
         isadmin() {
-            this.resolve('isAdmin')
+            this.resolve('isadmin')
         },
         params() {
             this.resolve('params')
@@ -322,6 +390,9 @@ let componentParams = {
         <slot name="header" v-bind="{displayedEntries}"/>
         <table ref="dataTable" class="table prevent-auto-init table-condensed display">
             <tfoot v-if="sumFieldsIds.length > 0 || sanitizedParam(params,isadmin,'displayadmincol')">
+                <tr>
+                    <th v-if="sanitizedParam(params,isadmin,'displayadmincol')"></th>
+                </tr>
             </tfoot>
         </table>
         <slot name="spinnerloader" v-bind="{displayedEntries}"/>
