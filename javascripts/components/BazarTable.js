@@ -66,16 +66,55 @@ let componentParams = {
             }
             return this.columns
         },
+        getDatatableOptions(){
+            const buttons = []
+            DATATABLE_OPTIONS.buttons.forEach((option) => {
+              buttons.push({
+                ...option,
+                ...{ footer: true },
+                ...{
+                  exportOptions: (
+                    option.extend != 'print'
+                      ? {
+                        orthogonal: 'sort', // use sort data for export
+                        columns(idx, data, node) {
+                          return !$(node).hasClass('not-export-this-col')
+                        }
+                      }
+                      : {
+                        columns(idx, data, node) {
+                          const isVisible = $(node).data('visible')
+                          return !$(node).hasClass('not-export-this-col') && (
+                            isVisible == undefined || isVisible != false
+                          )
+                        }
+                      })
+                }
+              })
+            })
+            return {
+                ...DATATABLE_OPTIONS,
+                ...{
+                  footerCallback: ()=>{
+                    this.updateFooter()
+                  },
+                  buttons
+                }
+              }
+        },
         async getDatatable(){
             if (this.dataTable === null){
                 // create dataTable
                 const columns = await this.getColumns()
                 this.dataTable = $(this.$refs.dataTable).DataTable({
-                    ...DATATABLE_OPTIONS,
+                    ...this.getDatatableOptions(),
                     ...{
                         columns: columns,
                         "scrollX": true
                     }
+                })
+                this.dataTable.on('draw', () => {
+                    this.updateNBResults()
                 })
             }
             return this.dataTable
@@ -138,6 +177,14 @@ let componentParams = {
                 listOfResolveReject.forEach(({resolve})=>resolve(this.params))
             }
         },
+        sanitizeValue(val) {
+          let sanitizedValue = val
+          if (Object.prototype.toString.call(val) === '[object Object]') {
+            // because if orthogonal data is defined, value is an object
+            sanitizedValue = val.display || ''
+          }
+          return (isNaN(sanitizedValue)) ? 1 : Number(sanitizedValue)
+        },
         updateColumns(form,canInit = false){
             if (this.columns.length > 0 || canInit){
 
@@ -148,6 +195,30 @@ let componentParams = {
             const dataTable = await this.getDatatable()
             this.removeRows(dataTable,newIds)
             this.addRows(dataTable,columns,newEntries)
+        },
+        updateNBResults(){
+            // TODO
+        },
+        updateFooter(){
+            if (this.dataTable !== null){
+                const activatedRows = []
+                this.dataTable.rows({ search: 'applied' }).every(function() {
+                  activatedRows.push(this.index())
+                })
+                const activatedCols = []
+                this.dataTable.columns('.sum-activated').every(function() {
+                  activatedCols.push(this.index())
+                })
+                activatedCols.forEach((indexCol) => {
+                  let sum = 0
+                  activatedRows.forEach((indexRow) => {
+                    const value = this.dataTable.row(indexRow).data()[indexCol]
+                    sum += this.sanitizeValue(value)
+                  })
+                  // the folowwing line needs jQuery
+                  $(this.dataTable.columns(indexCol).footer()).html(sum)
+                })
+            }
         },
         updateForms(){
             this.extractFormsIds().forEach((id,idx)=>{
@@ -168,7 +239,7 @@ let componentParams = {
             const promise = new Promise((resolve,reject)=>{
                 this.cacheResolveReject[name].push({resolve,reject})
             })
-            return await promise.then((...args)=>Promise.resolve(...args)) // force .then
+            return await promise.then((...args)=>Promise.resolve(...args)) // force .then()
         }
     },
     mounted(){
@@ -192,7 +263,7 @@ let componentParams = {
     template: `
     <div>
         <slot name="header" v-bind="{displayedEntries}"/>
-        <table ref="dataTable" class="table-striped"></table>
+        <table ref="dataTable" class="table prevent-auto-init table-condensed display"></table>
         <slot name="spinnerloader" v-bind="{displayedEntries}"/>
         <slot name="footer" v-bind="{displayedEntries}"/>
     </div>
