@@ -16,13 +16,28 @@ let componentParams = {
     components: {SpinnerLoader},
     data: function() {
         return {
+            cacheResolveReject: {},
             columns: [],
             dataTable: null,
             displayedEntries: {},
-            forms: {}
+            forms: {},
+            paramsReady: false
         };
     },
     methods:{
+        addRows(dataTable,columns,entries){
+            const entriesToAdd = entries.filter((entry)=>!(entry.id_fiche in this.displayedEntries))
+            let formattedDataList = []
+            entriesToAdd.forEach((entry)=>{
+                this.displayedEntries[entry.id_fiche] = entry
+                let formattedData = {}
+                columns.forEach((col)=>{
+                    formattedData[col.data] = col.data in entry ? entry[col.data] : ''
+                })
+                formattedDataList.push(formattedData)
+            })
+            dataTable.rows.add(formattedDataList).draw()
+        },
         arraysEqual(a, b) {
             if (a === b) return true
             if (a == null || b == null || !Array.isArray(a) || !Array.isArray(b)) return false
@@ -34,6 +49,36 @@ let componentParams = {
         },
         extractFormsIds(){
             return ('id' in this.params) ? this.params.id.split(',') : []
+        },
+        async getColumns(){
+            if (this.columns.length == 0){
+                const params = this.paramsReady ? this.params : await this.waitFor('params')
+                this.columns = [
+                    {
+                        data: 'id_fiche',
+                        title: 'id'
+                    },
+                    {
+                        data: 'bf_titre',
+                        title: 'Titre'
+                    }
+                ]
+            }
+            return this.columns
+        },
+        async getDatatable(){
+            if (this.dataTable === null){
+                // create dataTable
+                const columns = await this.getColumns()
+                this.dataTable = $(this.$refs.dataTable).DataTable({
+                    ...DATATABLE_OPTIONS,
+                    ...{
+                        columns: columns,
+                        "scrollX": true
+                    }
+                })
+            }
+            return this.dataTable
         },
         getFormData(formId){
             if (this.isLocalFormId(formId)){
@@ -74,40 +119,35 @@ let componentParams = {
             }
             return null
         },
-        mountTable(){
-            if (this.dataTable === null) {
-                this.dataTable = $(this.$refs.dataTable).DataTable({
-                    ...DATATABLE_OPTIONS,
-                    ...{
-                        data: [
-                            {
-                                name: 'test1',
-                                val: 'deux'
-                            },
-                            {
-                                name: 'test2',
-                                val: 'un'
-                            }
-                        ],
-                        columns: [
-                            {
-                                data: 'name',
-                                title: 'name'
-                            },
-                            {
-                                data: 'val',
-                                title: 'value'
-                            }
-                        ],
-                        "scrollX": true
-                    }
-                })
+        removeRows(dataTable,newIds){
+            let entryIdsToRemove = Object.keys(this.displayedEntries).filter((id)=>!newIds.includes(id))
+            entryIdsToRemove.forEach((id)=>{
+                if (id in this.displayedEntries){
+                    delete this.displayedEntries[id]
+                }
+            })
+            dataTable.rows((idx,data,node)=>{
+                return !('id_fiche' in data) || entryIdsToRemove.includes(data.id_fiche)
+            }).remove().draw()
+        },
+        resolveParams(){
+            if (this.paramsReady && 'params' in this.cacheResolveReject &&
+                Array.isArray(this.cacheResolveReject.params)){
+                const listOfResolveReject = this.cacheResolveReject.params
+                this.cacheResolveReject.params = []
+                listOfResolveReject.forEach(({resolve})=>resolve(this.params))
             }
         },
         updateColumns(form,canInit = false){
             if (this.columns.length > 0 || canInit){
 
             }
+        },
+        async updateEntries(newEntries,newIds){
+            const columns = await this.getColumns()
+            const dataTable = await this.getDatatable()
+            this.removeRows(dataTable,newIds)
+            this.addRows(dataTable,columns,newEntries)
         },
         updateForms(){
             this.extractFormsIds().forEach((id,idx)=>{
@@ -120,6 +160,15 @@ let componentParams = {
                         .catch(this.manageError)
                 }
             })
+        },
+        async waitFor(name){
+            if (!(name in this.cacheResolveReject)){
+                this.cacheResolveReject[name] = []
+            }
+            const promise = new Promise((resolve,reject)=>{
+                this.cacheResolveReject[name].push({resolve,reject})
+            })
+            return await promise.then((...args)=>Promise.resolve(...args)) // force .then
         }
     },
     mounted(){
@@ -132,10 +181,12 @@ let componentParams = {
           const newIds = newVal.map((e) => e.id_fiche)
           const oldIds = oldVal.map((e) => e.id_fiche)
           if (!this.arraysEqual(newIds, oldIds)) {
+            this.updateEntries(newVal,newIds).catch(this.manageError)
           }
         },
         params() {
-            this.updateForms()
+            this.paramsReady = true
+            this.resolveParams()
         },
     },
     template: `
