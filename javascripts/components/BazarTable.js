@@ -74,16 +74,19 @@ let componentParams = {
                         render: (data,type,row)=>{
                             return this.getDeleteChekbox(uuid,row.id_fiche,!data)
                         },
-                        title: this.getDeleteChekboxAll(uuid,'top')
+                        title: this.getDeleteChekboxAll(uuid,'top'),
+                        footer: this.getDeleteChekboxAll(uuid,'bottom')
                     })
                 }
                 columns.push({
                     data: 'id_fiche',
-                    title: 'id'
+                    title: 'id',
+                    footer: ''
                 })
                 columns.push({
                     data: 'bf_titre',
-                    title: 'Titre'
+                    title: 'Titre',
+                    footer: ''
                 })
                 this.columns = columns
             }
@@ -139,8 +142,8 @@ let componentParams = {
                 this.dataTable.on('draw', () => {
                     this.updateNBResults()
                 })
-                if (await this.sanitizedParamAsync('displayadmincol')){
-                    this.setCheckBoxAllInFooter()
+                if (/*sumFieldsIds.length > 0 ||*/ this.sanitizedParamAsync('displayadmincol')){
+                    this.initFooter(columns)
                 }
             }
             return this.dataTable
@@ -197,6 +200,19 @@ let componentParams = {
                 this.uuid = crypto.randomUUID()
             }
             return this.uuid
+        },
+        initFooter(columns){
+            const footer = $('<tr>')
+            columns.forEach((col)=>{
+                if ('footer' in col && col.footer.length > 0){
+                    const element = $(col.footer)
+                    const isTh = $(element).prop('tagName') === 'TH'
+                    footer.append(isTh ? element : $('<th>').append(element))
+                } else {
+                    footer.append($('<th>'))
+                }
+            })
+            this.dataTable.footer().to$().html(footer)
         },
         isLocalFormId(formId){
             return String(formId) === String(Number(formId)) && formId.slice(0,4) !== 'http'
@@ -296,10 +312,6 @@ let componentParams = {
           }
           return (isNaN(sanitizedValue)) ? 1 : Number(sanitizedValue)
         },
-        setCheckBoxAllInFooter(){
-            const uuid = this.getUuid()
-            this.dataTable.columns(0).footer().to$().html($(this.getDeleteChekboxAll(uuid,'bottom')).children().first())
-        },
         updateColumns(form,canInit = false){
             if (this.columns.length > 0 || canInit){
 
@@ -387,9 +399,7 @@ let componentParams = {
         <slot name="header" v-bind="{displayedEntries}"/>
         <table ref="dataTable" class="table prevent-auto-init table-condensed display">
             <tfoot v-if="sumFieldsIds.length > 0 || sanitizedParam(params,isadmin,'displayadmincol')">
-                <tr>
-                    <th v-if="sanitizedParam(params,isadmin,'displayadmincol')"></th>
-                </tr>
+                <tr></tr>
             </tfoot>
         </table>
         <slot name="spinnerloader" v-bind="{displayedEntries}"/>
