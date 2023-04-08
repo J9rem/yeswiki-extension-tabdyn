@@ -21,11 +21,11 @@
 
 {% block display_entries %}
   <Bazar-Table :params="params" :entries="entriesToDisplay" :ready="ready" :root="$root" :isadmin="{{ hasAcl("@admins")|json_encode }}">
-    <template #header="{displayedEntries}"></template>
-    <template #spinnerloader="{displayedEntries}">
+    <template #header="{displayedEntries,BazarTable}"></template>
+    <template #spinnerloader="{displayedEntries,BazarTable}">
       <spinner-loader v-if="isLoading || !ready" class="overlay super-overlay" :height="500"></spinner-loader>
     </template>
-    <template #footer="{displayedEntries}"></template>
+    <template #footer="{displayedEntries,BazarTable}"></template>
     <template #deletecheckbox="{targetId,itemId,disabled}">
       <td>
         {% set id = "`selectline_${targetId}_${itemId}`" %}
@@ -37,6 +37,7 @@
             type="checkbox"
             :id="{{id}}" 
             :name="{{id}}" 
+            data-csrftoken="to-be-defined"
             value="">
           <span></span>
         </label>
@@ -44,6 +45,20 @@
     </template>
     <template #deletecheckboxall>
       {{ multidelete.insertSelectAll('targetId','selectAllType') }}
+    </template>
+    <template #deleteallselectedbutton="{BazarTable,uuid}">
+      {# generate template reative for vuejs #}
+      {{ multidelete.insertButton('targetId','pages')|replace({
+        "onclick=\"multiDeleteService.updateNbSelected('MultiDeleteModaltargetId')\"": '@click="BazarTable.deleteAllSelected"',
+        'href="#MultiDeleteModaltargetId"': ':href="`#MultiDeleteModal${uuid}`"',
+        'MultiDeleteModaltargetIdLabel': '`MultiDeleteModal${uuid}Label`',
+        'MultiDeleteModaltargetId': '`MultiDeleteModal${uuid}`',
+        'targetId': 'uuid',
+        'id="': ':id="',
+        'aria-labelledby="': ':aria-labelledby="',
+        'data-target="': ':data-target="',
+        'start-btn-delete-all"': 'start-btn-delete-all" @click.prevent.stop="BazarTable.startDelete"'
+      })|raw }}
     </template>
   </Bazar-Table>
 {% endblock %}

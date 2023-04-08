@@ -59,6 +59,11 @@ let componentParams = {
             b.sort()
             return a.every((val,idx)=>a[idx] !== b[idx])
         },
+        deleteAllSelected(event){
+
+            multiDeleteService.updateNbSelected(`MultiDeleteModal${this.getUuid()}`)
+            // if something to do before showing modal (like get csrf token ?)
+        },
         extractFormsIds(){
             return ('id' in this.params) ? this.params.id.split(',') : []
         },
@@ -91,6 +96,20 @@ let componentParams = {
                 this.columns = columns
             }
             return this.columns
+        },
+        async getCsrfDeleteToken(entryId){
+            return await fetch(wiki.url(`${entryId}/deletepage`))
+                .then((response)=>{
+                    if (response.ok){
+                        return response.text()
+                    } else {
+                        throw new Error(`reponse was not ok when getting ${entryId}/deletepage`)
+                    }
+                })
+                .then((html)=>{
+                    const csrfTokenMatch = html.match(/name=\"csrf-token\" value=\"([^\"]*)\"/)
+                    return (csrfTokenMatch[1] == undefined || csrfTokenMatch[1].length == 0) ? 'no-token' : csrfTokenMatch[1]
+                })
         },
         getDatatableOptions(){
             const buttons = []
@@ -139,6 +158,7 @@ let componentParams = {
                         "scrollX": true
                     }
                 })
+                $(this.dataTable.table().node()).prop('id',this.getUuid())
                 this.dataTable.on('draw', () => {
                     this.updateNBResults()
                 })
@@ -312,6 +332,16 @@ let componentParams = {
           }
           return (isNaN(sanitizedValue)) ? 1 : Number(sanitizedValue)
         },
+        startDelete(event){
+            if (!multiDeleteService.isRunning) {
+                multiDeleteService.isRunning = true
+                const elem = event.target
+                if (elem) {
+                    $(elem).attr('disabled', 'disabled')
+                    multiDeleteService.deleteItems(elem)
+                }
+            }
+        },
         updateColumns(form,canInit = false){
             if (this.columns.length > 0 || canInit){
 
@@ -393,17 +423,36 @@ let componentParams = {
         params() {
             this.resolve('params')
         },
+        ready(){
+            this.sanitizedParamAsync('displayadmincol').then((displayadmincol)=>{
+                if (displayadmincol){
+                    $(this.$refs.buttondeleteall).find(`#MultiDeleteModal${this.getUuid()}`).first().each(function(){
+                        $(this).on('shown.bs.modal', function() {
+                            multiDeleteService.initProgressBar($(this))
+                            $(this).find('.modal-body .multi-delete-results').html('')
+                            $(this).find('button.start-btn-delete-all').removeAttr('disabled')
+                        })
+                        $(this).on('hidden.bs.modal', function() {
+                            multiDeleteService.modalClosing($(this))
+                        })
+                    })
+                }
+            }).catch(this.manageError)
+        }
     },
     template: `
     <div>
-        <slot name="header" v-bind="{displayedEntries}"/>
+        <slot name="header" v-bind="{displayedEntries,BazarTable:this}"/>
         <table ref="dataTable" class="table prevent-auto-init table-condensed display">
             <tfoot v-if="sumFieldsIds.length > 0 || sanitizedParam(params,isadmin,'displayadmincol')">
                 <tr></tr>
             </tfoot>
         </table>
-        <slot name="spinnerloader" v-bind="{displayedEntries}"/>
-        <slot name="footer" v-bind="{displayedEntries}"/>
+        <div ref="buttondeleteall">
+            <slot v-if="ready && sanitizedParam(params,isadmin,'displayadmincol')" name="deleteallselectedbutton" v-bind="{uuid:getUuid(),BazarTable:this}"/>
+        </div>
+        <slot name="spinnerloader" v-bind="{displayedEntries,BazarTable:this}"/>
+        <slot name="footer" v-bind="{displayedEntries,BazarTable:this}"/>
     </div>
   `
 };
