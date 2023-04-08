@@ -4,6 +4,8 @@
 # file that was distributed with this source code. 
 #}
 
+{% import "@core/multidelete-macro.twig" as multidelete %}
+
 {% extends "@bazar/entries/index-dynamic.twig" %}
 
 {% set necessary_fields = (params.necessary_fields is defined ? params.necessary_fields|split(',') : [])|merge(['owner']) %}
@@ -13,7 +15,6 @@
   {{ include_css('tools/tabdyn/styles/tabdyn.css') }}
 
   {{ include_javascript('javascripts/vendor/datatables-full/jquery.dataTables.min.js') }} 
-  {{ include_javascript('javascripts/multidelete.js') }}
   {{ include_javascript('tools/tabdyn/javascripts/components/BazarTable.js', false, true) }}
    
 {% endblock %}
@@ -25,5 +26,24 @@
       <spinner-loader v-if="isLoading || !ready" class="overlay super-overlay" :height="500"></spinner-loader>
     </template>
     <template #footer="{displayedEntries}"></template>
+    <template #deletecheckbox="{targetId,itemId,disabled}">
+      <td>
+        {% set id = "`selectline_${targetId}_${itemId}`" %}
+        <label :for="{{id}}">
+          <input
+            :disabled="disabled" 
+            :class="disabled ? null : {selectline:true}" 
+            :data-itemid="disabled ? null : itemId"
+            type="checkbox"
+            :id="{{id}}" 
+            :name="{{id}}" 
+            value="">
+          <span></span>
+        </label>
+      </td>
+    </template>
+    <template #deletecheckboxall>
+      {{ multidelete.insertSelectAll('targetId','selectAllType') }}
+    </template>
   </Bazar-Table>
 {% endblock %}

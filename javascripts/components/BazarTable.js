@@ -26,6 +26,7 @@ let componentParams = {
                 params: false
             },
             sumFieldsIds: [],
+            templatesForRendering: {},
             uuid: null
         };
     },
@@ -145,39 +146,16 @@ let componentParams = {
             return this.dataTable
         },
         getDeleteChekbox(targetId,itemId,disabled = false){
-            const id = `selectline_${targetId}_${itemId}`
-            return `
-                <td>
-                    <label for="${id}">
-                        <input
-                            `+ (disabled
-                            ? 'disabled'
-                            : `class="selectline"
-                               data-itemid="${itemId}"
-                              `
-                            )+`
-                            type="checkbox"
-                            id="${id}" 
-                            name="${id}" 
-                            value="">
-                        <span></span>
-                    </label>
-                </td>
-            `
+            return this.getTemplateFromSlot(
+                'deletecheckbox',
+                {targetId:'targetId',itemId:'itemId',disabled}
+            ).replace(/targetId/g,targetId)
+            .replace(/itemId/g,itemId)
         },
         getDeleteChekboxAll(targetId,selectAllType){
-            return `
-                <th class="prevent-sorting not-export-this-col">
-                    <label class="check-all-container" for="checkbox_checkall_${selectAllType}_${targetId}">
-                    <input
-                        type="checkbox"
-                        id="checkbox_checkall_${selectAllType}_${targetId}" 
-                        name="checkbox_checkall_${selectAllType}_${targetId}" 
-                        value="" onclick="checkAllFirstCol(this)">
-                    <span></span>
-                    </label>
-                </th>
-            `
+            return this.getTemplateFromSlot('deletecheckboxall',{})
+                .replace(/targetId/g,targetId)
+                .replace(/selectAllType/g,selectAllType)
         },
         getFormData(formId){
             if (this.isLocalFormId(formId)){
@@ -194,6 +172,25 @@ let componentParams = {
                     localFormId: (!localFormId || localFormId.length == 0) ? externalFormId : localFormId
                 }
             }
+        },
+        getTemplateFromSlot(name,params){
+            const key = name+'-'+JSON.stringify(params)
+            if (!(key in this.templatesForRendering)){
+                if (name in this.$scopedSlots){
+                    const slot = this.$scopedSlots[name]
+                    const constructor = Vue.extend({
+                        render: function(h){
+                            return h('div',{},slot(params))
+                        }
+                    })
+                    const instance = new constructor()
+                    instance.$mount()
+                    this.templatesForRendering[key] = instance.$el.childNodes[0].outerHTML
+                } else {
+                    this.templatesForRendering[key] = ''
+                }
+            }
+            return this.templatesForRendering[key]
         },
         getUuid(){
             if (this.uuid === null){
