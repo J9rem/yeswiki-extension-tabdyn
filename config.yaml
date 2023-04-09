@@ -7,6 +7,9 @@ services:
     autowire: true
     public: true
 
+  YesWiki\Tabdyn\Controller\:
+    resource: 'controllers/*'
+
   YesWiki\Tabdyn\Service\:
     resource: 'services/*'
 

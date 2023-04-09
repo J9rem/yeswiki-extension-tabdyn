@@ -60,8 +60,25 @@ let componentParams = {
             return a.every((val,idx)=>a[idx] !== b[idx])
         },
         deleteAllSelected(event){
-
-            multiDeleteService.updateNbSelected(`MultiDeleteModal${this.getUuid()}`)
+            const uuid = this.getUuid()
+            multiDeleteService.updateNbSelected(`MultiDeleteModal${uuid}`)
+            const entriesIdsToRefreshDeleteToken = []
+            $(`#${uuid}`).find('tr > td:first-child input.selectline[type=checkbox]:visible:checked').each(function (){
+                const csrfToken = $(this).data('csrftoken')
+                const itemId = $(this).data('itemid')
+                if (typeof itemId === 'string' && itemId.length > 0 && (typeof csrfToken !== 'string' || csrfToken === 'to-be-defined')){
+                    entriesIdsToRefreshDeleteToken.push({elem:$(this),itemId})
+                }
+            })
+            if (entriesIdsToRefreshDeleteToken.length > 0){
+                this.getCsrfDeleteTokens(entriesIdsToRefreshDeleteToken.map((e)=>e.itemId))
+                    .then((tokens)=>{
+                        entriesIdsToRefreshDeleteToken.forEach(({elem,itemId})=>{
+                            $(elem).data('csrftoken',tokens[itemId] || 'error')
+                        })
+                    })
+                    .catch(this.manageError)
+            }
             // if something to do before showing modal (like get csrf token ?)
         },
         extractFormsIds(){
@@ -98,18 +115,12 @@ let componentParams = {
             return this.columns
         },
         async getCsrfDeleteToken(entryId){
-            return await fetch(wiki.url(`${entryId}/deletepage`))
-                .then((response)=>{
-                    if (response.ok){
-                        return response.text()
-                    } else {
-                        throw new Error(`reponse was not ok when getting ${entryId}/deletepage`)
-                    }
-                })
-                .then((html)=>{
-                    const csrfTokenMatch = html.match(/name=\"csrf-token\" value=\"([^\"]*)\"/)
-                    return (csrfTokenMatch[1] == undefined || csrfTokenMatch[1].length == 0) ? 'no-token' : csrfTokenMatch[1]
-                })
+            return await this.getJson(wiki.url(`?api/pages/${entryId}/delete/getToken`))
+            .then((json)=>('token' in json && typeof json.token === 'string') ? json.token : 'error')
+        },
+        async getCsrfDeleteTokens(entriesIds){
+            return await this.getJson(wiki.url(`?api/pages/example/delete/getTokens`,{pages:entriesIds.join(',')}))
+            .then((json)=>('tokens' in json && typeof json.tokens === 'object') ? json.tokens : entriesIds.reduce((o, key) => ({ ...o, [key]: 'error'}), {}))
         },
         getDatatableOptions(){
             const buttons = []
@@ -196,6 +207,16 @@ let componentParams = {
                 }
             }
         },
+        async getJson(url){
+            return await fetch(url)
+                .then((response)=>{
+                    if (response.ok){
+                        return response.json()
+                    } else {
+                        throw new Error(`reponse was not ok when getting "${url}"`)
+                    }
+                })
+        },
         getTemplateFromSlot(name,params){
             const key = name+'-'+JSON.stringify(params)
             if (!(key in this.templatesForRendering)){
@@ -239,13 +260,7 @@ let componentParams = {
         },
         async loadForm(formId){
             const {url,localFormId} = this.getFormData(formId)
-            return await fetch(url)
-            .then((response)=>{
-                if (!response.ok){
-                    throw new Error(`Response was not ok when getting ${formId} from ${url}`)
-                }
-                return response.json()
-            })
+            return await this.getJson(url)
             .then((form)=>{
                 this.forms[formId] = {...form,...{localFormId}}
                 return form
