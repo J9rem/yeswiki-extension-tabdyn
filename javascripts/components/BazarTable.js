@@ -42,10 +42,15 @@ let componentParams = {
                         formattedData[col.data] = !this.$root.isExternalUrl(entry) && 
                             'owner' in entry &&
                             (isadmin || entry.owner == currentusername)
+                    } else if (typeof col.data === 'string' && ['==adminsbuttons=='].includes(col.data)) {
+                        formattedData[col.data] = ''
                     } else {
                         formattedData[col.data] = col.data in entry ? entry[col.data] : ''
                     }
                 })
+                if (!('url' in formattedData)){
+                    formattedData.url = entry.url || ''
+                }
                 formattedDataList.push(formattedData)
             })
             dataTable.rows.add(formattedDataList).draw()
@@ -84,6 +89,21 @@ let componentParams = {
         extractFormsIds(){
             return ('id' in this.params) ? this.params.id.split(',') : []
         },
+        getAdminsButtons(entryId,entryTitle,entryUrl,candelete){
+            const isExternal =this.$root.isExternalUrl({id_fiche:entryId,url:entryUrl})
+            return this.getTemplateFromSlot(
+                'adminsbuttons',
+                {
+                    entryId:'entryId',
+                    entryTitle:'entryTitle',
+                    entryUrl:'entryUrl',
+                    isExternal,
+                    candelete
+                }
+            ).replace(/entryId/g,entryId)
+            .replace(/entryTitle/g,entryTitle)
+            .replace(/entryUrl/g,entryUrl)
+        },
         async getColumns(){
             if (this.columns.length == 0){
                 const params = await this.waitFor('params')
@@ -98,6 +118,14 @@ let componentParams = {
                         },
                         title: this.getDeleteChekboxAll(uuid,'top'),
                         footer: this.getDeleteChekboxAll(uuid,'bottom')
+                    })
+                    columns.push({
+                        data: '==adminsbuttons==',
+                        render: (data,type,row)=>{
+                            return this.getAdminsButtons(row.id_fiche,row.bf_titre || '',row.url || '',row['==canDelete=='])
+                        },
+                        title: '',
+                        footer: ''
                     })
                 }
                 columns.push({

@@ -60,5 +60,38 @@
         'start-btn-delete-all"': 'start-btn-delete-all" @click.prevent.stop="BazarTable.startDelete"'
       })|raw }}
     </template>
+    <template #adminsbuttons="{entryId,entryTitle,entryUrl,isExternal,candelete}">
+      <a :href="isExternal ? `${entryUrl}/editiframe` : `{{ url({tag:'${entryId}',handler:'editiframe'}) }}`"
+        data-toggle="tooltip"
+        data-placement="left"
+        class="btn btn-default btn-icon btn-xs modalbox"
+        data-size="modal-lg"
+        data-iframe="1"
+        :title="`{{ _t('MODIFY') }} ${entryId}`"
+        onclick="$(this).tooltip('hide');$(this).attr('title',$(this).data('original-title'));"
+        >
+        <i class="fas fa-pencil-alt"></i>
+      </a>
+      <a v-if="candelete"
+        :href="`{{ url({tag:'${entryId}',handler:'deletepage',params:{incomingurl:url({handler:''})}}) }}`"
+        data-toggle="tooltip"
+        data-placement="left"
+        class="btn btn-danger btn-icon btn-xs modalbox"
+        :title="`{{ _t('DELETE') }} ${entryId}`"
+        onclick="$(this).tooltip('hide');$(this).attr('title',$(this).data('original-title'));"
+        >
+        <i class="fas fa-trash"></i>
+      </a>
+      <button
+        v-else-if="!isExternal"
+        disabled="disabled"
+        data-toggle="tooltip"
+        data-placement="left"
+        class="btn btn-danger btn-icon btn-xs"
+        title="{{ _t('DELETEPAGE_NOT_OWNER') }}"
+        >
+        <i class="fas fa-trash"></i>
+      </buttom>
+    </template>
   </Bazar-Table>
 {% endblock %}
