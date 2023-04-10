@@ -20,9 +20,10 @@ let componentParams = {
             columns: [],
             dataTable: null,
             displayedEntries: {},
+            fields: {},
             forms: {},
             isReady:{
-                isadmin: true,
+                fields: false,
                 params: false
             },
             sumFieldsIds: [],
@@ -53,7 +54,7 @@ let componentParams = {
                 }
                 formattedDataList.push(formattedData)
             })
-            dataTable.rows.add(formattedDataList).draw()
+            dataTable.rows.add(formattedDataList)
         },
         arraysEqual(a, b) {
             if (a === b) return true
@@ -106,9 +107,24 @@ let componentParams = {
         },
         async getColumns(){
             if (this.columns.length == 0){
-                const params = await this.waitFor('params')
+                const fields = await this.waitFor('fields')
                 const displayadmincol = await this.sanitizedParamAsync('displayadmincol')
+                let columnfieldsids = await this.sanitizedParamAsync('columnfieldsids')
+                console.log({columnfieldsids})
+                if (columnfieldsids.every((id)=>id.length ==0)){
+                    // backup
+                    columnfieldsids = ['bf_titre']
+                }
                 const columns = []
+                if (!('id_fiche' in columnfieldsids)){
+                    // backup to be sure to have entryId in row
+                    columns.push({
+                        data: 'id_fiche',
+                        title: 'id_fiche',
+                        footer: '',
+                        visible: false
+                    })
+                }
                 if (displayadmincol){
                     const uuid = this.getUuid()
                     columns.push({
@@ -128,15 +144,17 @@ let componentParams = {
                         footer: ''
                     })
                 }
-                columns.push({
-                    data: 'id_fiche',
-                    title: 'id',
-                    footer: ''
-                })
-                columns.push({
-                    data: 'bf_titre',
-                    title: 'Titre',
-                    footer: ''
+                columnfieldsids.forEach((id)=>{
+                    if (id.length >0 && id in fields){
+                        const field = fields[id]
+                        if (typeof field.propertyname === 'string' && field.propertyname.length > 0){
+                            columns.push({
+                                data: field.propertyname,
+                                title: field.label || field.propertyname,
+                                footer: ''
+                            })
+                        }
+                    }
                 })
                 this.columns = columns
             }
@@ -309,7 +327,7 @@ let componentParams = {
             })
             dataTable.rows((idx,data,node)=>{
                 return !('id_fiche' in data) || entryIdsToRemove.includes(data.id_fiche)
-            }).remove().draw()
+            }).remove()
         },
         resolve(name){
             this.isReady[name] = true
@@ -321,7 +339,7 @@ let componentParams = {
             }
         },
         async sanitizedParamAsync(name){
-            return await this.sanitizedParam(await this.waitFor('params'),await this.waitFor('isadmin'),name)
+            return await this.sanitizedParam(await this.waitFor('params'),this.isadmin,name)
         },
         sanitizedParam(params,isAdmin,name){
             switch (name) {
@@ -349,6 +367,12 @@ let componentParams = {
                 case 'displayimagesasthumbnails':
                     return name in params ? [true,1,'1','true'].includes(params[name]) : false
                     
+                case 'columnfieldsids':
+                case 'columntitles':
+                case 'sumfieldsids':
+                    return (name in params && typeof params[name] === 'string')
+                        ? params[name].split(',').map((v)=>v.trim())
+                        : []
                 case 'columnswidth':
                     const columnswidth = {}
                     if (
@@ -394,9 +418,15 @@ let componentParams = {
             const columns = await this.getColumns()
             const dataTable = await this.getDatatable()
             const currentusername = await this.sanitizedParamAsync('currentusername')
-            const isadmin = await this.waitFor('isadmin')
             this.removeRows(dataTable,newIds)
-            this.addRows(dataTable,columns,newEntries,currentusername,isadmin)
+            this.addRows(dataTable,columns,newEntries,currentusername,this.isadmin)
+            this.dataTable.draw()
+        },
+        updateFieldsFromRoot(){
+            this.fields = this.$root.formFields
+            if (Object.keys(this.fields).length > 0){
+                this.resolve('fields')
+            }
         },
         updateNBResults(){
             // TODO
@@ -451,17 +481,16 @@ let componentParams = {
         $(isVueJS3 ? this.$el.parentNode : this.$el).on('dblclick',function(e) {
           return false;
         });
+        this.updateFieldsFromRoot()
     },
     watch: {
         entries(newVal, oldVal) {
-          const newIds = newVal.map((e) => e.id_fiche)
-          const oldIds = oldVal.map((e) => e.id_fiche)
-          if (!this.arraysEqual(newIds, oldIds)) {
-            this.updateEntries(newVal,newIds).catch(this.manageError)
-          }
-        },
-        isadmin() {
-            this.resolve('isadmin')
+            this.updateFieldsFromRoot() // because updated in same time than entries (but not reactive)
+            const newIds = newVal.map((e) => e.id_fiche)
+            const oldIds = oldVal.map((e) => e.id_fiche)
+            if (!this.arraysEqual(newIds, oldIds)) {
+                this.updateEntries(newVal,newIds).catch(this.manageError)
+            }
         },
         params() {
             this.resolve('params')
