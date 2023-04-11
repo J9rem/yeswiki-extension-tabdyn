@@ -39,12 +39,16 @@ let componentParams = {
                 this.displayedEntries[entry.id_fiche] = entry
                 let formattedData = {}
                 columns.forEach((col)=>{
-                    if (col.data === '==canDelete=='){
+                    if (!(typeof col.data === 'string')){
+                        formattedData[col.data] = ''
+                    } else if (col.data === '==canDelete=='){
                         formattedData[col.data] = !this.$root.isExternalUrl(entry) && 
                             'owner' in entry &&
                             (isadmin || entry.owner == currentusername)
-                    } else if (typeof col.data === 'string' && ['==adminsbuttons=='].includes(col.data)) {
+                    } else if (['==adminsbuttons=='].includes(col.data)) {
                         formattedData[col.data] = ''
+                    } else if ('geolocation' in entry && col.data in entry.geolocation){
+                        formattedData[col.data] = entry.geolocation[col.data]
                     } else {
                         formattedData[col.data] = col.data in entry ? entry[col.data] : ''
                     }
@@ -110,16 +114,16 @@ let componentParams = {
                 const fields = await this.waitFor('fields')
                 const displayadmincol = await this.sanitizedParamAsync('displayadmincol')
                 let columnfieldsids = await this.sanitizedParamAsync('columnfieldsids')
-                console.log({columnfieldsids})
                 if (columnfieldsids.every((id)=>id.length ==0)){
                     // backup
                     columnfieldsids = ['bf_titre']
                 }
-                const columns = []
+                const data = {columns:[]}
                 if (!('id_fiche' in columnfieldsids)){
                     // backup to be sure to have entryId in row
-                    columns.push({
+                    data.columns.push({
                         data: 'id_fiche',
+                        orderable: false,
                         class: 'not-export-this-col',
                         title: 'id_fiche',
                         footer: '',
@@ -128,17 +132,19 @@ let componentParams = {
                 }
                 if (displayadmincol){
                     const uuid = this.getUuid()
-                    columns.push({
+                    data.columns.push({
                         data: '==canDelete==',
                         class: 'not-export-this-col',
+                        orderable: false,
                         render: (data,type,row)=>{
                             return type === 'display' ? this.getDeleteChekbox(uuid,row.id_fiche,!data) : ''
                         },
                         title: this.getDeleteChekboxAll(uuid,'top'),
                         footer: this.getDeleteChekboxAll(uuid,'bottom')
                     })
-                    columns.push({
+                    data.columns.push({
                         data: '==adminsbuttons==',
+                        orderable: false,
                         class: 'horizontal-admins-btn not-export-this-col',
                         render: (data,type,row)=>{
                             return type === 'display' ? this.getAdminsButtons(row.id_fiche,row.bf_titre || '',row.url || '',row['==canDelete==']) : ''
@@ -149,17 +155,33 @@ let componentParams = {
                 }
                 columnfieldsids.forEach((id)=>{
                     if (id.length >0 && id in fields){
-                        const field = fields[id]
-                        if (typeof field.propertyname === 'string' && field.propertyname.length > 0){
-                            columns.push({
-                                data: field.propertyname,
-                                title: field.label || field.propertyname,
-                                footer: ''
-                            })
-                        }
+                        this.registerField(fields[id],data)
                     }
                 })
-                this.columns = columns
+                if (await this.sanitizedParamAsync('exportallcolumns')){
+                    Object.keys(fields).forEach((id)=>{
+                        // append fields not displayed
+                        if (!columnfieldsids.includes(id)){
+                            this.registerField(fields[id],data,false,false)
+                        }
+                    })
+                }
+
+                const params = await this.waitFor('params');
+                [
+                    ['displaycreationdate','date_creation_fiche','creationdatetranslate'],
+                    ['displaylastchangedate','date_maj_fiche','modifiydatetranslate'],
+                    ['displayowner','owner','ownertranslate']
+                ].forEach(([paramName,propertyName,slotName])=>{
+                    if (this.sanitizedParam(params,this.isadmin,paramName)){
+                        data.columns.push({
+                            data: propertyName,
+                            title: this.getTemplateFromSlot(slotName,{}),
+                            footer: ''
+                        })
+                    }
+                })
+                this.columns = data.columns
             }
             return this.columns
         },
@@ -191,7 +213,7 @@ let componentParams = {
                           const isVisible = $(node).data('visible')
                           return !$(node).hasClass('not-export-this-col') && (
                             isVisible == undefined || isVisible != false
-                          )
+                          ) && !$(node).hasClass('not-printable')
                         }
                       })
                 }
@@ -211,11 +233,20 @@ let componentParams = {
             if (this.dataTable === null){
                 // create dataTable
                 const columns = await this.getColumns()
+                let firstColumnOrderable = 0
+                for (let index = 0; index < columns.length; index++) {
+                    if ('orderable' in columns[index]  && !columns[index].orderable){
+                        firstColumnOrderable += 1
+                    } else {
+                        break
+                    }
+                }
                 this.dataTable = $(this.$refs.dataTable).DataTable({
                     ...this.getDatatableOptions(),
                     ...{
                         columns: columns,
-                        "scrollX": true
+                        "scrollX": true,
+                        order: [[firstColumnOrderable,'asc']]
                     }
                 })
                 $(this.dataTable.table().node()).prop('id',this.getUuid())
@@ -325,6 +356,34 @@ let componentParams = {
             }
             return null
         },
+        registerField(field,data,visible=true,printable=true){
+            if (typeof field.propertyname === 'string' && field.propertyname.length > 0){
+                if (typeof field.type === 'string' && field.type === 'map'){
+                    data.columns.push({
+                        class: printable ? '' : 'not-printable',
+                        data: field.latitudeField || 'bf_latitude',
+                        title: this.getTemplateFromSlot('latitudetext',{}),
+                        footer: '',
+                        visible
+                    })
+                    data.columns.push({
+                        class: printable ? '' : 'not-printable',
+                        data: field.longitudeField || 'bf_longitude',
+                        title: this.getTemplateFromSlot('longitudetext',{}),
+                        footer: '',
+                        visible
+                    })
+                } else {
+                    data.columns.push({
+                        class: printable ? '' : 'not-printable',
+                        data: field.propertyname,
+                        title: field.label || field.propertyname,
+                        footer: '',
+                        visible
+                    })
+                }
+            }
+        },
         removeRows(dataTable,newIds){
             let entryIdsToRemove = Object.keys(this.displayedEntries).filter((id)=>!newIds.includes(id))
             entryIdsToRemove.forEach((id)=>{
@@ -346,7 +405,7 @@ let componentParams = {
             }
         },
         async sanitizedParamAsync(name){
-            return await this.sanitizedParam(await this.waitFor('params'),this.isadmin,name)
+            return this.sanitizedParam(await this.waitFor('params'),this.isadmin,name)
         },
         sanitizedParam(params,isAdmin,name){
             switch (name) {
@@ -369,9 +428,13 @@ let componentParams = {
                         default:
                             return false
                     }
+                case 'checkboxfieldsincolumns':
+                    // default true
+                    return name in params ? !([false,0,'0','false'].includes(params[name])) : true
                 case 'displayvaluesinsteadofkeys':
                 case 'exportallcolumns':
                 case 'displayimagesasthumbnails':
+                    // default false
                     return name in params ? [true,1,'1','true'].includes(params[name]) : false
                     
                 case 'columnfieldsids':

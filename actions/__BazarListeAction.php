@@ -38,17 +38,9 @@ class __BazarListeAction extends YesWikiAction
             $currentUserName= empty($currentUser['name']) ? '' : $currentUser['name'];
             $newArg['currentusername'] = $currentUserName;
             if (empty($arg['columnfieldsids'])){
-                $formId = empty($arg['id']) ? '1' : array_values(array_filter(explode(',',$arg['id']),function($id){
-                    return strval($id) == strval(intval($id));
-                }))[0];
-                $form = $this->getService(FormManager::class)->getOne($formId);
-                if (!empty($form['prepared'])){
-                    $newArg['columnfieldsids'] = implode(',',array_map(function($field){
-                        return $field->getPropertyName();
-                    },array_filter($form['prepared'],function($field){
-                        return !empty($field->getPropertyName());
-                    })));
-                }
+                $this->appendAllFieldsIds($arg,$newArg,'columnfieldsids');
+            } elseif ($this->formatBoolean($arg,false,'exportallcolumns')){
+                $this->appendAllFieldsIds($arg,$newArg,'exportallcolumnsids');
             }
         } 
         return $newArg;
@@ -56,5 +48,19 @@ class __BazarListeAction extends YesWikiAction
 
     public function run()
     {
+    }
+
+    protected function appendAllFieldsIds(array $arg, array &$newArg,string $key){
+        $formId = empty($arg['id']) ? '1' : array_values(array_filter(explode(',',$arg['id']),function($id){
+            return strval($id) == strval(intval($id));
+        }))[0];
+        $form = $this->getService(FormManager::class)->getOne($formId);
+        if (!empty($form['prepared'])){
+            $newArg[$key] = implode(',',array_map(function($field){
+                return $field->getPropertyName();
+            },array_filter($form['prepared'],function($field){
+                return !empty($field->getPropertyName());
+            })));
+        }
     }
 }

@@ -11,10 +11,16 @@
 {% set necessary_fields = (params.necessary_fields is defined ? params.necessary_fields|split(',') : [])
   |merge(['owner'])
   |merge((
-    params.columnfieldsids is defined
-    ? params.columnfieldsids|split(',')
-    :[]
-  )) %}
+    (params.exportallcolumns is defined and (params.exportallcolumns == '1' or params.exportallcolumns == 'true'))
+    ? params.exportallcolumnsids|split(',')
+    : (params.columnfieldsids is defined
+      ? params.columnfieldsids|split(',')
+      : []
+    )
+  ))
+  |merge((params.displaycreationdate is defined and (params.displaycreationdate != 'no'))? ['date_creation_fiche']: [])
+  |merge((params.displaylastchangedate is defined and (params.displaycreationdate != 'no'))? ['date_maj_fiche']: [])
+  %}
 
 {% block assets %}
   {{ include_css('styles/vendor/datatables-full/dataTables.bootstrap.min.css') }}
@@ -100,5 +106,10 @@
         <i class="fas fa-trash"></i>
       </buttom>
     </template>
+    <template #creationdatetranslate>{{ _t('BAZ_DATE_CREATION') }}</template>
+    <template #latitudetext>{{ _t('BAZ_LATITUDE') }}</template>
+    <template #longitudetext>{{ _t('BAZ_LONGITUDE') }}</template>
+    <template #modifiydatetranslate>{{ _t('BAZ_DATE_MAJ') }}</template>
+    <template #ownertranslate>{{ _t('TEMPLATE_OWNER') }}</template>
   </Bazar-Table>
 {% endblock %}
