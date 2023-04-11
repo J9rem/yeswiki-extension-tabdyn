@@ -103,7 +103,7 @@ let componentParams = {
                     entryTitle:'entryTitle',
                     entryUrl:'entryUrl',
                     isExternal,
-                    candelete
+                    candelete: [true,'true'].includes(candelete)
                 }
             ).replace(/entryId/g,entryId)
             .replace(/entryTitle/g,entryTitle)
