@@ -111,5 +111,17 @@
     <template #longitudetext>{{ _t('BAZ_LONGITUDE') }}</template>
     <template #modifiydatetranslate>{{ _t('BAZ_DATE_MAJ') }}</template>
     <template #ownertranslate>{{ _t('TEMPLATE_OWNER') }}</template>
+    <template #rendercell="{anchorData,fieldtype,addLink,entryId,url}">
+      {#- supported fieldtype empty,url -#}
+      <template v-if="addLink">
+        <a :href="url" v-html="anchorData" class="modalbox" data-size="modal-lg"></a>
+      </template>
+      <template v-else-if="fieldtype === 'url'">
+        <a :href="anchorData" v-html="anchorData" class="new-window"></a>
+      </template>
+      <template v-else>
+        {{-'{{anchorData}}'-}}
+      </template>
+    </template>
   </Bazar-Table>
 {% endblock %}

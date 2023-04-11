@@ -47,8 +47,10 @@ let componentParams = {
                             (isadmin || entry.owner == currentusername)
                     } else if (['==adminsbuttons=='].includes(col.data)) {
                         formattedData[col.data] = ''
-                    } else if ('geolocation' in entry && col.data in entry.geolocation){
-                        formattedData[col.data] = entry.geolocation[col.data]
+                    } else if ('firstlevel' in col && typeof col.firstlevel === 'string' && col.firstlevel.length > 0){
+                        formattedData[col.data] = (col.firstlevel in entry && col.data in entry[col.firstlevel]) ? entry[col.firstlevel][col.data] : ''
+                    } else if ('checkboxfield' in col && typeof col.checkboxfield === 'string' && col.checkboxfield.length > 0){
+                        formattedData[col.data] = (col.checkboxfield in entry && 'checkboxkey' in col && entry[col.checkboxfield].split(',').includes(col.checkboxkey)) ? 'X' : ''
                     } else {
                         formattedData[col.data] = col.data in entry ? entry[col.data] : ''
                     }
@@ -114,6 +116,7 @@ let componentParams = {
                 const fields = await this.waitFor('fields')
                 const displayadmincol = await this.sanitizedParamAsync('displayadmincol')
                 let columnfieldsids = await this.sanitizedParamAsync('columnfieldsids')
+                let checkboxfieldsincolumns = await this.sanitizedParamAsync('checkboxfieldsincolumns')
                 if (columnfieldsids.every((id)=>id.length ==0)){
                     // backup
                     columnfieldsids = ['bf_titre']
@@ -153,16 +156,16 @@ let componentParams = {
                         footer: ''
                     })
                 }
-                columnfieldsids.forEach((id)=>{
+                columnfieldsids.forEach((id,idx)=>{
                     if (id.length >0 && id in fields){
-                        this.registerField(fields[id],data)
+                        this.registerField(fields[id],data,checkboxfieldsincolumns,true,true,idx === 0 && !('bf_titre' in columnfieldsids))
                     }
                 })
                 if (await this.sanitizedParamAsync('exportallcolumns')){
                     Object.keys(fields).forEach((id)=>{
                         // append fields not displayed
                         if (!columnfieldsids.includes(id)){
-                            this.registerField(fields[id],data,false,false)
+                            this.registerField(fields[id],data,checkboxfieldsincolumns,false,false)
                         }
                     })
                 }
@@ -356,28 +359,46 @@ let componentParams = {
             }
             return null
         },
-        registerField(field,data,visible=true,printable=true){
+        registerField(field,data,checkboxfieldsincolumns=false,visible=true,printable=true,addLink=false){
             if (typeof field.propertyname === 'string' && field.propertyname.length > 0){
                 if (typeof field.type === 'string' && field.type === 'map'){
                     data.columns.push({
                         class: printable ? '' : 'not-printable',
-                        data: field.latitudeField || 'bf_latitude',
+                        data: field.latitudeField,
                         title: this.getTemplateFromSlot('latitudetext',{}),
+                        firstlevel: field.propertyname,
                         footer: '',
                         visible
                     })
                     data.columns.push({
                         class: printable ? '' : 'not-printable',
-                        data: field.longitudeField || 'bf_longitude',
+                        data: field.longitudeField,
                         title: this.getTemplateFromSlot('longitudetext',{}),
+                        firstlevel: field.propertyname,
                         footer: '',
                         visible
+                    })
+                } else if (checkboxfieldsincolumns && 
+                    typeof field.type === 'string' && 
+                    ['checkboxfiche','checkbox'].includes(field.type) &&
+                    typeof field.options == 'object') {
+                    Object.keys(field.options).forEach((optionKey)=>{
+                        data.columns.push({
+                            class: printable ? '' : 'not-printable',
+                            data: `${field.propertyname}-${optionKey}`,
+                            title: `${field.label || field.propertyname} - ${field.options[optionKey] || optionKey}`,
+                            checkboxfield: field.propertyname,
+                            checkboxkey: optionKey,
+                            footer: '',
+                            visible
+                        })
                     })
                 } else {
                     data.columns.push({
                         class: printable ? '' : 'not-printable',
                         data: field.propertyname,
                         title: field.label || field.propertyname,
+                        render: this.renderCell({addLink}),
                         footer: '',
                         visible
                     })
@@ -402,6 +423,14 @@ let componentParams = {
                 const listOfResolveReject = this.cacheResolveReject[name]
                 this.cacheResolveReject[name] = []
                 listOfResolveReject.forEach(({resolve})=>resolve(name in this ? this[name] : null))
+            }
+        },
+        renderCell({fieldtype='',addLink=false}){
+            const template = this.getTemplateFromSlot('rendercell',{anchorData:'anchorData',fieldtype,addLink,entryId:'entryIdAnchor',url:'anchorUrl'})
+            return (data,type,row)=>{
+                return template.replace(/anchorData/g,data.replace(/\n/g,'<br/>'))
+                  .replace(/entryIdAnchor/g,row.id_fiche)
+                  .replace(/anchorUrl/g,row.url)
             }
         },
         async sanitizedParamAsync(name){
