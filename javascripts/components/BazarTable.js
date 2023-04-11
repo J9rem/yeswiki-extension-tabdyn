@@ -137,6 +137,7 @@ let componentParams = {
                     })
                     columns.push({
                         data: '==adminsbuttons==',
+                        class: 'horizontal-admins-btn',
                         render: (data,type,row)=>{
                             return this.getAdminsButtons(row.id_fiche,row.bf_titre || '',row.url || '',row['==canDelete=='])
                         },
@@ -275,7 +276,11 @@ let componentParams = {
                     })
                     const instance = new constructor()
                     instance.$mount()
-                    this.templatesForRendering[key] = instance.$el.childNodes[0].outerHTML
+                    let outerHtml = '';
+                    for (let index = 0; index < instance.$el.childNodes.length; index++) {
+                        outerHtml += instance.$el.childNodes[index].outerHTML || instance.$el.childNodes[index].textContent
+                    }
+                    this.templatesForRendering[key] = outerHtml
                 } else {
                     this.templatesForRendering[key] = ''
                 }
