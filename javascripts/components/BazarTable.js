@@ -120,6 +120,7 @@ let componentParams = {
                     // backup to be sure to have entryId in row
                     columns.push({
                         data: 'id_fiche',
+                        class: 'not-export-this-col',
                         title: 'id_fiche',
                         footer: '',
                         visible: false
@@ -129,17 +130,18 @@ let componentParams = {
                     const uuid = this.getUuid()
                     columns.push({
                         data: '==canDelete==',
+                        class: 'not-export-this-col',
                         render: (data,type,row)=>{
-                            return this.getDeleteChekbox(uuid,row.id_fiche,!data)
+                            return type === 'display' ? this.getDeleteChekbox(uuid,row.id_fiche,!data) : ''
                         },
                         title: this.getDeleteChekboxAll(uuid,'top'),
                         footer: this.getDeleteChekboxAll(uuid,'bottom')
                     })
                     columns.push({
                         data: '==adminsbuttons==',
-                        class: 'horizontal-admins-btn',
+                        class: 'horizontal-admins-btn not-export-this-col',
                         render: (data,type,row)=>{
-                            return this.getAdminsButtons(row.id_fiche,row.bf_titre || '',row.url || '',row['==canDelete=='])
+                            return type === 'display' ? this.getAdminsButtons(row.id_fiche,row.bf_titre || '',row.url || '',row['==canDelete==']) : ''
                         },
                         title: '',
                         footer: ''
