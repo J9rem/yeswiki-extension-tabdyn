@@ -113,47 +113,63 @@ let componentParams = {
         async getColumns(){
             if (this.columns.length == 0){
                 const fields = await this.waitFor('fields')
-                const displayadmincol = await this.sanitizedParamAsync('displayadmincol')
-                let columnfieldsids = await this.sanitizedParamAsync('columnfieldsids')
-                let checkboxfieldsincolumns = await this.sanitizedParamAsync('checkboxfieldsincolumns')
-                let sumfieldsids = await this.sanitizedParamAsync('sumfieldsids')
+                const params = await this.waitFor('params');
+                let columnfieldsids = this.sanitizedParam(params,this.isAdmin,'columnfieldsids')
+                let defaultcolumnwidth = this.sanitizedParam(params,this.isAdmin,'defaultcolumnwidth')
                 if (columnfieldsids.every((id)=>id.length ==0)){
                     // backup
                     columnfieldsids = ['bf_titre']
                 }
                 const data = {columns:[]}
-                if (displayadmincol){
+                const width = defaultcolumnwidth.length > 0 ? {width:defaultcolumnwidth}: {}
+                if (this.sanitizedParam(params,this.isAdmin,'displayadmincol')){
                     const uuid = this.getUuid()
                     data.columns.push({
-                        data: '==canDelete==',
-                        class: 'not-export-this-col',
-                        orderable: false,
-                        render: (data,type,row)=>{
-                            return type === 'display' ? this.getDeleteChekbox(uuid,row.id_fiche,!data) : ''
+                        ...{
+                            data: '==canDelete==',
+                            class: 'not-export-this-col',
+                            orderable: false,
+                            render: (data,type,row)=>{
+                                return type === 'display' ? this.getDeleteChekbox(uuid,row.id_fiche,!data) : ''
+                            },
+                            title: this.getDeleteChekboxAll(uuid,'top'),
+                            footer: this.getDeleteChekboxAll(uuid,'bottom')
                         },
-                        title: this.getDeleteChekboxAll(uuid,'top'),
-                        footer: this.getDeleteChekboxAll(uuid,'bottom')
+                        ...width
                     })
                     data.columns.push({
-                        data: '==adminsbuttons==',
-                        orderable: false,
-                        class: 'horizontal-admins-btn not-export-this-col',
-                        render: (data,type,row)=>{
-                            return type === 'display' ? this.getAdminsButtons(row.id_fiche,row.bf_titre || '',row.url || '',row['==canDelete==']) : ''
+                        ...{
+                            data: '==adminsbuttons==',
+                            orderable: false,
+                            class: 'horizontal-admins-btn not-export-this-col',
+                            render: (data,type,row)=>{
+                                return type === 'display' ? this.getAdminsButtons(row.id_fiche,row.bf_titre || '',row.url || '',row['==canDelete==']) : ''
+                            },
+                            title: '',
+                            footer: ''
                         },
-                        title: '',
-                        footer: ''
+                        ...width
                     })
+                }
+                const options={
+                    checkboxfieldsincolumns: this.sanitizedParam(params,this.isAdmin,'checkboxfieldsincolumns'),
+                    columnswidth: this.sanitizedParam(params,this.isAdmin,'columnswidth'),
+                    defaultcolumnwidth,
+                    sumfieldsids: this.sanitizedParam(params,this.isAdmin,'sumfieldsids'),
+                    visible:true,
+                    printable:true,
+                    addLink:false
                 }
                 columnfieldsids.forEach((id,idx)=>{
                     if (id.length >0 && id in fields){
                         this.registerField(data,{
-                            field:fields[id],
-                            checkboxfieldsincolumns,
-                            sumfieldsids,
-                            visible:true,
-                            printable:true,
-                            addLink:idx === 0 && !('bf_titre' in columnfieldsids)
+                            ...options,
+                            ...{
+                                field:fields[id],
+                                visible:true,
+                                printable:true,
+                                addLink:idx === 0 && !('bf_titre' in columnfieldsids)
+                            }
                         })
                     }
                 })
@@ -162,17 +178,18 @@ let componentParams = {
                         // append fields not displayed
                         if (!columnfieldsids.includes(id)){
                             this.registerField(data,{
-                                field:fields[id],
-                                checkboxfieldsincolumns,
-                                sumfieldsids,
-                                visible:false,
-                                printable:false
+                                ...options,
+                                ...{
+                                    field:fields[id],
+                                    visible:false,
+                                    printable:false,
+                                    addLink:false
+                                }
                             })
                         }
                     })
                 }
 
-                const params = await this.waitFor('params');
                 [
                     ['displaycreationdate','date_creation_fiche','creationdatetranslate'],
                     ['displaylastchangedate','date_maj_fiche','modifiydatetranslate'],
@@ -339,25 +356,41 @@ let componentParams = {
             }
             return null
         },
-        registerField(data,{field,checkboxfieldsincolumns=false,sumfieldsids=[],visible=true,printable=true,addLink=false}){
+        registerField(data,{
+                field,
+                checkboxfieldsincolumns=false,
+                sumfieldsids=[],
+                visible=true,
+                printable=true,
+                addLink=false,
+                columnswidth={},
+                defaultcolumnwidth=''
+            }){
             if (typeof field.propertyname === 'string' && field.propertyname.length > 0){
                 const className = (printable ? '' : 'not-printable')+(sumfieldsids.includes(field.propertyname) ? ' sum-activated': '')
+                const width = field.propertyname in columnswidth ? {width:columnswidth[field.propertyname]} : (defaultcolumnwidth.length > 0 ? {width:defaultcolumnwidth}: {})
                 if (typeof field.type === 'string' && field.type === 'map'){
                     data.columns.push({
-                        class: className,
-                        data: field.latitudeField,
-                        title: this.getTemplateFromSlot('latitudetext',{}),
-                        firstlevel: field.propertyname,
-                        footer: '',
-                        visible
+                        ...{
+                            class: className,
+                            data: field.latitudeField,
+                            title: this.getTemplateFromSlot('latitudetext',{}),
+                            firstlevel: field.propertyname,
+                            footer: '',
+                            visible
+                        },
+                        ...width
                     })
                     data.columns.push({
-                        class: className,
-                        data: field.longitudeField,
-                        title: this.getTemplateFromSlot('longitudetext',{}),
-                        firstlevel: field.propertyname,
-                        footer: '',
-                        visible
+                        ...{
+                            class: className,
+                            data: field.longitudeField,
+                            title: this.getTemplateFromSlot('longitudetext',{}),
+                            firstlevel: field.propertyname,
+                            footer: '',
+                            visible
+                        },
+                        ...width
                     })
                 } else if (checkboxfieldsincolumns && 
                     typeof field.type === 'string' && 
@@ -365,23 +398,29 @@ let componentParams = {
                     typeof field.options == 'object') {
                     Object.keys(field.options).forEach((optionKey)=>{
                         data.columns.push({
-                            class: className,
-                            data: `${field.propertyname}-${optionKey}`,
-                            title: `${field.label || field.propertyname} - ${field.options[optionKey] || optionKey}`,
-                            checkboxfield: field.propertyname,
-                            checkboxkey: optionKey,
-                            footer: '',
-                            visible
+                            ...{
+                                class: className,
+                                data: `${field.propertyname}-${optionKey}`,
+                                title: `${field.label || field.propertyname} - ${field.options[optionKey] || optionKey}`,
+                                checkboxfield: field.propertyname,
+                                checkboxkey: optionKey,
+                                footer: '',
+                                visible
+                            },
+                            ...width
                         })
                     })
                 } else {
                     data.columns.push({
-                        class: className,
-                        data: field.propertyname,
-                        title: field.label || field.propertyname,
-                        render: this.renderCell({addLink}),
-                        footer: '',
-                        visible
+                        ...{
+                            class: className,
+                            data: field.propertyname,
+                            title: field.label || field.propertyname,
+                            render: this.renderCell({addLink}),
+                            footer: '',
+                            visible
+                        },
+                        ...width
                     })
                 }
             }
@@ -459,7 +498,7 @@ let componentParams = {
                         name in params && 
                         typeof params[name] === 'string'
                     ) {
-                        params[name].split(',').foreach((extract)=>{
+                        params[name].split(',').forEach((extract)=>{
                             const [name,value] = extract.split('=',2)
                             if (name && value && name.length > 0 && value.length > 0){
                                 columnswidth[name] = value
@@ -467,6 +506,8 @@ let componentParams = {
                         })
                     }
                     return columnswidth
+                case 'defaultcolumnwidth':
+                    return name in params ? String(params[name]) : ''
                 default:
                     return params[name] || null
             }
