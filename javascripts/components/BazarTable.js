@@ -245,6 +245,7 @@ let componentParams = {
             return {
                 ...DATATABLE_OPTIONS,
                 ...{
+                  searching: false,
                   footerCallback: ()=>{
                     this.updateFooter()
                   },
@@ -274,9 +275,6 @@ let componentParams = {
                     }
                 })
                 $(this.dataTable.table().node()).prop('id',this.getUuid())
-                this.dataTable.on('draw', () => {
-                    this.updateNBResults()
-                })
                 if (sumfieldsids.length > 0 || this.sanitizedParamAsync('displayadmincol')){
                     this.initFooter(columns,sumfieldsids)
                 }
@@ -464,6 +462,9 @@ let componentParams = {
         },
         renderCell({fieldtype='',fieldName='',addLink=false,idx=-1}){
             return (data,type,row)=>{
+                if (type === 'sort'){
+                    return data
+                }
                 let anchorData = 'anchorData'
                 let anchorImageSpecificPart = ''
                 let anchorImageOther = ''
@@ -639,9 +640,6 @@ let componentParams = {
             if (Object.keys(this.fields).length > 0){
                 this.resolve('fields')
             }
-        },
-        updateNBResults(){
-            // TODO
         },
         updateFooter(){
             if (this.dataTable !== null){
