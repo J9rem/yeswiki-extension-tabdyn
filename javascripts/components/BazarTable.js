@@ -158,7 +158,9 @@ let componentParams = {
                     sumfieldsids: this.sanitizedParam(params,this.isAdmin,'sumfieldsids'),
                     visible:true,
                     printable:true,
-                    addLink:false
+                    addLink:false,
+                    columntitles:this.sanitizedParam(params,this.isAdmin,'columntitles'),
+                    baseIdx: Math.max(data.columns.length -1,0)
                 }
                 columnfieldsids.forEach((id,idx)=>{
                     if (id.length >0 && id in fields){
@@ -364,17 +366,20 @@ let componentParams = {
                 printable=true,
                 addLink=false,
                 columnswidth={},
-                defaultcolumnwidth=''
+                defaultcolumnwidth='',
+                columntitles={},
+                baseIdx=0
             }){
             if (typeof field.propertyname === 'string' && field.propertyname.length > 0){
                 const className = (printable ? '' : 'not-printable')+(sumfieldsids.includes(field.propertyname) ? ' sum-activated': '')
                 const width = field.propertyname in columnswidth ? {width:columnswidth[field.propertyname]} : (defaultcolumnwidth.length > 0 ? {width:defaultcolumnwidth}: {})
+                const titleIdx = data.columns.length - baseIdx
                 if (typeof field.type === 'string' && field.type === 'map'){
                     data.columns.push({
                         ...{
                             class: className,
                             data: field.latitudeField,
-                            title: this.getTemplateFromSlot('latitudetext',{}),
+                            title: columntitles[field.latitudeField] || columntitles[titleIdx] || this.getTemplateFromSlot('latitudetext',{}),
                             firstlevel: field.propertyname,
                             footer: '',
                             visible
@@ -385,7 +390,7 @@ let componentParams = {
                         ...{
                             class: className,
                             data: field.longitudeField,
-                            title: this.getTemplateFromSlot('longitudetext',{}),
+                            title: columntitles[field.longitudeField] || columntitles[titleIdx+1] || this.getTemplateFromSlot('longitudetext',{}),
                             firstlevel: field.propertyname,
                             footer: '',
                             visible
@@ -396,12 +401,20 @@ let componentParams = {
                     typeof field.type === 'string' && 
                     ['checkboxfiche','checkbox'].includes(field.type) &&
                     typeof field.options == 'object') {
-                    Object.keys(field.options).forEach((optionKey)=>{
+                    Object.keys(field.options).forEach((optionKey,idx)=>{
+                        const name = `${field.propertyname}-${optionKey}`
                         data.columns.push({
                             ...{
                                 class: className,
-                                data: `${field.propertyname}-${optionKey}`,
-                                title: `${field.label || field.propertyname} - ${field.options[optionKey] || optionKey}`,
+                                data: name,
+                                title: columntitles[name] || 
+                                    (
+                                        field.propertyname in columntitles 
+                                        ? `${columntitles[field.propertyname]} - ${field.options[optionKey] || optionKey}` 
+                                        : undefined
+                                    ) || 
+                                    columntitles[titleIdx+idx] || 
+                                    `${field.label || field.propertyname} - ${field.options[optionKey] || optionKey}`,
                                 checkboxfield: field.propertyname,
                                 checkboxkey: optionKey,
                                 footer: '',
@@ -415,7 +428,7 @@ let componentParams = {
                         ...{
                             class: className,
                             data: field.propertyname,
-                            title: field.label || field.propertyname,
+                            title: columntitles[field.propertyname] || columntitles[titleIdx] || field.label || field.propertyname,
                             render: this.renderCell({addLink}),
                             footer: '',
                             visible
@@ -487,7 +500,25 @@ let componentParams = {
                     return name in params ? [true,1,'1','true'].includes(params[name]) : false
                     
                 case 'columnfieldsids':
+                case 'sumfieldsids':
+                    return (name in params && typeof params[name] === 'string')
+                        ? params[name].split(',').map((v)=>v.trim())
+                        : []
                 case 'columntitles':
+                    const columntitlesastab = (name in params && typeof params[name] === 'string')
+                        ? params[name].split(',').map((v)=>v.trim())
+                        : []
+                    const columntitles = {}
+                    columntitlesastab.forEach((val,idx)=>{
+                        const match = val.match(/^([A-Za-z0-9\-_]+)=(.+$)/)
+                        if (match){
+                            const [,key,title] = match
+                            columntitles[key] = title
+                        } else {
+                            columntitles[idx] = val
+                        }
+                    })
+                    return columntitles
                 case 'sumfieldsids':
                     return (name in params && typeof params[name] === 'string')
                         ? params[name].split(',').map((v)=>v.trim())
