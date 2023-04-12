@@ -50,6 +50,11 @@ let componentParams = {
                         formattedData[col.data] = (col.firstlevel in entry && col.data in entry[col.firstlevel]) ? entry[col.firstlevel][col.data] : ''
                     } else if ('checkboxfield' in col && typeof col.checkboxfield === 'string' && col.checkboxfield.length > 0){
                         formattedData[col.data] = (col.checkboxfield in entry && 'checkboxkey' in col && entry[col.checkboxfield].split(',').includes(col.checkboxkey)) ? 'X' : ''
+                    } else if ('displayValOptions' in col){
+                        formattedData[col.data] = col.data in entry ? {
+                            display:entry[col.data].split(',').map((v)=>v in col.displayValOptions ? col.displayValOptions[v] : v).join(",\n"),
+                            export: entry[col.data].split(',').map((v)=>v in col.displayValOptions ? `"${col.displayValOptions[v]}"` : v).join(',')
+                        } : ''
                     } else {
                         formattedData[col.data] = col.data in entry ? entry[col.data] : ''
                     }
@@ -159,6 +164,8 @@ let componentParams = {
                     printable:true,
                     addLink:false,
                     columntitles:this.sanitizedParam(params,this.isAdmin,'columntitles'),
+                    displayimagesasthumbnails:this.sanitizedParam(params,this.isAdmin,'displayimagesasthumbnails'),
+                    displayvaluesinsteadofkeys:this.sanitizedParam(params,this.isAdmin,'displayvaluesinsteadofkeys'),
                     baseIdx: data.columns.length
                 }
                 columnfieldsids.forEach((id,idx)=>{
@@ -365,7 +372,9 @@ let componentParams = {
                 columnswidth={},
                 defaultcolumnwidth='',
                 columntitles={},
-                baseIdx=0
+                baseIdx=0,
+                displayimagesasthumbnails=false,
+                displayvaluesinsteadofkeys=false
             }){
             if (typeof field.propertyname === 'string' && field.propertyname.length > 0){
                 const className = (printable ? '' : 'not-printable')+(sumfieldsids.includes(field.propertyname) ? ' sum-activated': '')
@@ -424,8 +433,13 @@ let componentParams = {
                         })
                     })
                 } else {
-                    const fieldtype = ['link','email','image'].includes(field.type) ? field.type: ''
-                    const fieldName = fieldtype === 'image' ? field.propertyname : ''
+                    const fieldtype = ['link','email'].includes(field.type) ? field.type: ((field.type === 'image' && displayimagesasthumbnails)?'image':'')
+                    const fieldName = (fieldtype === 'image' && displayimagesasthumbnails) ? field.propertyname : ''
+                    const displayValOptions = (displayvaluesinsteadofkeys && 'options' in field && typeof field.options === 'object')
+                    ? {
+                        displayValOptions:field.options
+                    } 
+                    : {}
                     data.columns.push({
                         ...{
                             class: className,
@@ -435,7 +449,8 @@ let componentParams = {
                             footer: '',
                             visible
                         },
-                        ...width
+                        ...width,
+                        ...displayValOptions
                     })
                 }
             }
@@ -462,45 +477,46 @@ let componentParams = {
         },
         renderCell({fieldtype='',fieldName='',addLink=false,idx=-1}){
             return (data,type,row)=>{
-                if (type === 'sort'){
-                    return data
+                if (type === 'sort' || type === 'filter'){
+                    return (typeof data === 'object' && 'export' in data) ? data.export : data
                 }
+                const formattedData = (typeof data === 'object' && 'display' in data) ? data.display : data
                 let anchorData = 'anchorData'
                 let anchorImageSpecificPart = ''
                 let anchorImageOther = ''
                 let anchorImageExt = ''
                 let anchorOtherEntryId = ''
                 if (fieldtype === 'image'){
-                    if(data.length > 0){
+                    if(formattedData.length > 0){
                         let regExp = new RegExp(`^(${row.id_fiche}_${fieldName}_)(.*)_(\\d{14})_(\\d{14})\\.([^.]+)$`)
-                        if (regExp.test(data)) {
+                        if (regExp.test(formattedData)) {
                             let anchorImageDate1 = ''
                             let anchorImageDate2 = '';
-                            [,,anchorImageSpecificPart,anchorImageDate1,anchorImageDate2,anchorImageExt] = data.match(regExp)
+                            [,,anchorImageSpecificPart,anchorImageDate1,anchorImageDate2,anchorImageExt] = formattedData.match(regExp)
                             anchorImageOther = `${anchorImageDate1}_${anchorImageDate2}`
                             anchorData = 'entryIdAnchor_fieldNameAnchor_anchorImageSpecificPart_anchorImageOther.anchorImageExt'
                         } else {
                             regExp = new RegExp(`^(${row.id_fiche}_${fieldName}_)(.*)\\.([^.]+)$`)
-                            if (regExp.test(data)) {
-                                [,,anchorImageSpecificPart,anchorImageExt] = data.match(regExp)
+                            if (regExp.test(formattedData)) {
+                                [,,anchorImageSpecificPart,anchorImageExt] = formattedData.match(regExp)
                                 anchorData = 'entryIdAnchor_fieldNameAnchor_anchorImageSpecificPart.anchorImageExt'
                             } else {
                                 // maybe from other entry
                                 regExp = new RegExp(`^([A-Za-z0-9-_]+)(_${fieldName}_)(.*)_(\\d{14})_(\\d{14})\\.([^.]+)$`)
-                                if (regExp.test(data)) {
+                                if (regExp.test(formattedData)) {
                                     let anchorImageDate1 = ''
                                     let anchorImageDate2 = '';
-                                    [,anchorOtherEntryId,,anchorImageSpecificPart,anchorImageDate1,anchorImageDate2,anchorImageExt] = data.match(regExp)
+                                    [,anchorOtherEntryId,,anchorImageSpecificPart,anchorImageDate1,anchorImageDate2,anchorImageExt] = formattedData.match(regExp)
                                     anchorImageOther = `${anchorImageDate1}_${anchorImageDate2}`
                                     anchorData = 'anchorOtherEntryId_fieldNameAnchor_anchorImageSpecificPart_anchorImageOther.anchorImageExt'
                                 } else {
                                     // last possible format
                                     regExp = new RegExp('^(.*)\\.([^.]+)$')
-                                    if (regExp.test(data)) {
-                                        [,anchorImageSpecificPart,anchorImageExt] = data.match(regExp)
+                                    if (regExp.test(formattedData)) {
+                                        [,anchorImageSpecificPart,anchorImageExt] = formattedData.match(regExp)
                                         anchorData = 'anchorImageSpecificPart.anchorImageExt'
                                     } else {
-                                        anchorImageSpecificPart = data
+                                        anchorImageSpecificPart = formattedData
                                         anchorData = 'anchorImageSpecificPart'
                                     }
                                 }
@@ -520,7 +536,7 @@ let componentParams = {
                     color: (idx === 0 && row.color.length > 0) ? 'lightslategray' : '',
                     icon: (idx === 0 && row.icon.length > 0) ? 'iconAnchor' : ''
                 })
-                return template.replace(/anchorData/g,data.replace(/\n/g,'<br/>'))
+                return template.replace(/anchorData/g,formattedData.replace(/\n/g,'<br/>'))
                   .replace(/entryIdAnchor/g,row.id_fiche)
                   .replace(/anchorUrl/g,row.url)
                   .replace(/lightslategray/g,row.color)
