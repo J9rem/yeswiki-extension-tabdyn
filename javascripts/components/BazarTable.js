@@ -26,7 +26,6 @@ let componentParams = {
                 fields: false,
                 params: false
             },
-            sumFieldsIds: [],
             templatesForRendering: {},
             uuid: null
         };
@@ -55,6 +54,9 @@ let componentParams = {
                         formattedData[col.data] = col.data in entry ? entry[col.data] : ''
                     }
                 })
+                if (!('id_fiche' in formattedData)){
+                    formattedData.id_fiche = entry.id_fiche || ''
+                }
                 if (!('url' in formattedData)){
                     formattedData.url = entry.url || ''
                 }
@@ -93,9 +95,6 @@ let componentParams = {
             }
             // if something to do before showing modal (like get csrf token ?)
         },
-        extractFormsIds(){
-            return ('id' in this.params) ? this.params.id.split(',') : []
-        },
         getAdminsButtons(entryId,entryTitle,entryUrl,candelete){
             const isExternal =this.$root.isExternalUrl({id_fiche:entryId,url:entryUrl})
             return this.getTemplateFromSlot(
@@ -117,22 +116,12 @@ let componentParams = {
                 const displayadmincol = await this.sanitizedParamAsync('displayadmincol')
                 let columnfieldsids = await this.sanitizedParamAsync('columnfieldsids')
                 let checkboxfieldsincolumns = await this.sanitizedParamAsync('checkboxfieldsincolumns')
+                let sumfieldsids = await this.sanitizedParamAsync('sumfieldsids')
                 if (columnfieldsids.every((id)=>id.length ==0)){
                     // backup
                     columnfieldsids = ['bf_titre']
                 }
                 const data = {columns:[]}
-                if (!('id_fiche' in columnfieldsids)){
-                    // backup to be sure to have entryId in row
-                    data.columns.push({
-                        data: 'id_fiche',
-                        orderable: false,
-                        class: 'not-export-this-col',
-                        title: 'id_fiche',
-                        footer: '',
-                        visible: false
-                    })
-                }
                 if (displayadmincol){
                     const uuid = this.getUuid()
                     data.columns.push({
@@ -158,14 +147,27 @@ let componentParams = {
                 }
                 columnfieldsids.forEach((id,idx)=>{
                     if (id.length >0 && id in fields){
-                        this.registerField(fields[id],data,checkboxfieldsincolumns,true,true,idx === 0 && !('bf_titre' in columnfieldsids))
+                        this.registerField(data,{
+                            field:fields[id],
+                            checkboxfieldsincolumns,
+                            sumfieldsids,
+                            visible:true,
+                            printable:true,
+                            addLink:idx === 0 && !('bf_titre' in columnfieldsids)
+                        })
                     }
                 })
                 if (await this.sanitizedParamAsync('exportallcolumns')){
                     Object.keys(fields).forEach((id)=>{
                         // append fields not displayed
                         if (!columnfieldsids.includes(id)){
-                            this.registerField(fields[id],data,checkboxfieldsincolumns,false,false)
+                            this.registerField(data,{
+                                field:fields[id],
+                                checkboxfieldsincolumns,
+                                sumfieldsids,
+                                visible:false,
+                                printable:false
+                            })
                         }
                     })
                 }
@@ -236,6 +238,7 @@ let componentParams = {
             if (this.dataTable === null){
                 // create dataTable
                 const columns = await this.getColumns()
+                const sumfieldsids = await this.sanitizedParamAsync('sumfieldsids')
                 let firstColumnOrderable = 0
                 for (let index = 0; index < columns.length; index++) {
                     if ('orderable' in columns[index]  && !columns[index].orderable){
@@ -256,8 +259,8 @@ let componentParams = {
                 this.dataTable.on('draw', () => {
                     this.updateNBResults()
                 })
-                if (/*sumFieldsIds.length > 0 ||*/ this.sanitizedParamAsync('displayadmincol')){
-                    this.initFooter(columns)
+                if (sumfieldsids.length > 0 || this.sanitizedParamAsync('displayadmincol')){
+                    this.initFooter(columns,sumfieldsids)
                 }
             }
             return this.dataTable
@@ -273,22 +276,6 @@ let componentParams = {
             return this.getTemplateFromSlot('deletecheckboxall',{})
                 .replace(/targetId/g,targetId)
                 .replace(/selectAllType/g,selectAllType)
-        },
-        getFormData(formId){
-            if (this.isLocalFormId(formId)){
-                return {
-                    url: wiki.url(`?api/forms/${formId}`),
-                    localFormId: formId
-                }
-            } else {
-                const [baseUrl,rest] = formId.split('|',2)
-                const externalFormId = (rest.match(/^([0-9]+)(?:->[0-9]+)?$/) || ['',''])[1]
-                const localFormId = (rest.match(/^(?:[0-9]+->)([0-9]+)$/)|| ['',''])[1]
-                return {
-                    url: baseUrl+(baseUrl.slice(-1) === '?' ? '' : '?')+`api/forms/${externalFormId}`,
-                    localFormId: (!localFormId || localFormId.length == 0) ? externalFormId : localFormId
-                }
-            }
         },
         async getJson(url){
             return await fetch(url)
@@ -329,29 +316,22 @@ let componentParams = {
             }
             return this.uuid
         },
-        initFooter(columns){
+        initFooter(columns,sumfieldsids){
             const footer = $('<tr>')
+            let displayTotal = sumfieldsids.length > 0
             columns.forEach((col)=>{
                 if ('footer' in col && col.footer.length > 0){
                     const element = $(col.footer)
                     const isTh = $(element).prop('tagName') === 'TH'
                     footer.append(isTh ? element : $('<th>').append(element))
+                } else if (displayTotal) {
+                    displayTotal = false
+                    footer.append($('<th>').text(this.getTemplateFromSlot('sumtranslate',{})))
                 } else {
                     footer.append($('<th>'))
                 }
             })
             this.dataTable.footer().to$().html(footer)
-        },
-        isLocalFormId(formId){
-            return String(formId) === String(Number(formId)) && formId.slice(0,4) !== 'http'
-        },
-        async loadForm(formId){
-            const {url,localFormId} = this.getFormData(formId)
-            return await this.getJson(url)
-            .then((form)=>{
-                this.forms[formId] = {...form,...{localFormId}}
-                return form
-            })
         },
         manageError(error){
             if (wiki.isDebugEnabled){
@@ -359,11 +339,12 @@ let componentParams = {
             }
             return null
         },
-        registerField(field,data,checkboxfieldsincolumns=false,visible=true,printable=true,addLink=false){
+        registerField(data,{field,checkboxfieldsincolumns=false,sumfieldsids=[],visible=true,printable=true,addLink=false}){
             if (typeof field.propertyname === 'string' && field.propertyname.length > 0){
+                const className = (printable ? '' : 'not-printable')+(sumfieldsids.includes(field.propertyname) ? ' sum-activated': '')
                 if (typeof field.type === 'string' && field.type === 'map'){
                     data.columns.push({
-                        class: printable ? '' : 'not-printable',
+                        class: className,
                         data: field.latitudeField,
                         title: this.getTemplateFromSlot('latitudetext',{}),
                         firstlevel: field.propertyname,
@@ -371,7 +352,7 @@ let componentParams = {
                         visible
                     })
                     data.columns.push({
-                        class: printable ? '' : 'not-printable',
+                        class: className,
                         data: field.longitudeField,
                         title: this.getTemplateFromSlot('longitudetext',{}),
                         firstlevel: field.propertyname,
@@ -384,7 +365,7 @@ let componentParams = {
                     typeof field.options == 'object') {
                     Object.keys(field.options).forEach((optionKey)=>{
                         data.columns.push({
-                            class: printable ? '' : 'not-printable',
+                            class: className,
                             data: `${field.propertyname}-${optionKey}`,
                             title: `${field.label || field.propertyname} - ${field.options[optionKey] || optionKey}`,
                             checkboxfield: field.propertyname,
@@ -395,7 +376,7 @@ let componentParams = {
                     })
                 } else {
                     data.columns.push({
-                        class: printable ? '' : 'not-printable',
+                        class: className,
                         data: field.propertyname,
                         title: field.label || field.propertyname,
                         render: this.renderCell({addLink}),
@@ -508,11 +489,6 @@ let componentParams = {
                 }
             }
         },
-        updateColumns(form,canInit = false){
-            if (this.columns.length > 0 || canInit){
-
-            }
-        },
         async updateEntries(newEntries,newIds){
             const columns = await this.getColumns()
             const dataTable = await this.getDatatable()
@@ -536,32 +512,16 @@ let componentParams = {
                 this.dataTable.rows({ search: 'applied' }).every(function() {
                   activatedRows.push(this.index())
                 })
-                const activatedCols = []
-                this.dataTable.columns('.sum-activated').every(function() {
-                  activatedCols.push(this.index())
-                })
-                activatedCols.forEach((indexCol) => {
-                  let sum = 0
-                  activatedRows.forEach((indexRow) => {
-                    const value = this.dataTable.row(indexRow).data()[indexCol]
-                    sum += this.sanitizeValue(value)
-                  })
-                  // the folowwing line needs jQuery
-                  $(this.dataTable.columns(indexCol).footer()).html(sum)
+                this.dataTable.columns('.sum-activated').every((indexCol) => {
+                    let col = this.dataTable.column(indexCol)
+                    let sum = 0
+                    activatedRows.forEach((indexRow) => {
+                      const value = this.dataTable.row(indexRow).data()[col.dataSrc()]
+                      sum += this.sanitizeValue(Number(value))
+                    })
+                    this.dataTable.footer().to$().find(`> tr > th:nth-child(${indexCol+1})`).html(sum)
                 })
             }
-        },
-        updateForms(){
-            this.extractFormsIds().forEach((id,idx)=>{
-                if (!(id in this.forms)){
-                    this.forms[id] = {}
-                    this.loadForm(id)
-                        .then((form)=>{
-                            this.updateColumns(form,(idx === 0))
-                        })
-                        .catch(this.manageError)
-                }
-            })
         },
         async waitFor(name){
             if (this.isReady[name]){
@@ -615,7 +575,7 @@ let componentParams = {
     <div>
         <slot name="header" v-bind="{displayedEntries,BazarTable:this}"/>
         <table ref="dataTable" class="table prevent-auto-init table-condensed display">
-            <tfoot v-if="sumFieldsIds.length > 0 || sanitizedParam(params,isadmin,'displayadmincol')">
+            <tfoot v-if="sanitizedParam(params,isadmin,'sumfieldsids').length > 0 || sanitizedParam(params,isadmin,'displayadmincol')">
                 <tr></tr>
             </tfoot>
         </table>
