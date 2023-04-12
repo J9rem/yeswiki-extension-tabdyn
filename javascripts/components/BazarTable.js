@@ -53,13 +53,12 @@ let componentParams = {
                     } else {
                         formattedData[col.data] = col.data in entry ? entry[col.data] : ''
                     }
+                });
+                ['id_fiche','color','icon','url'].forEach((key)=>{
+                    if (!(key in formattedData)){
+                        formattedData[key] = entry[key] || ''
+                    }
                 })
-                if (!('id_fiche' in formattedData)){
-                    formattedData.id_fiche = entry.id_fiche || ''
-                }
-                if (!('url' in formattedData)){
-                    formattedData.url = entry.url || ''
-                }
                 formattedDataList.push(formattedData)
             })
             dataTable.rows.add(formattedDataList)
@@ -160,7 +159,7 @@ let componentParams = {
                     printable:true,
                     addLink:false,
                     columntitles:this.sanitizedParam(params,this.isAdmin,'columntitles'),
-                    baseIdx: Math.max(data.columns.length -1,0)
+                    baseIdx: data.columns.length
                 }
                 columnfieldsids.forEach((id,idx)=>{
                     if (id.length >0 && id in fields){
@@ -381,6 +380,7 @@ let componentParams = {
                             data: field.latitudeField,
                             title: columntitles[field.latitudeField] || columntitles[titleIdx] || this.getTemplateFromSlot('latitudetext',{}),
                             firstlevel: field.propertyname,
+                            render: this.renderCell({addLink,idx:titleIdx}),
                             footer: '',
                             visible
                         },
@@ -392,6 +392,7 @@ let componentParams = {
                             data: field.longitudeField,
                             title: columntitles[field.longitudeField] || columntitles[titleIdx+1] || this.getTemplateFromSlot('longitudetext',{}),
                             firstlevel: field.propertyname,
+                            render: this.renderCell({addLink}),
                             footer: '',
                             visible
                         },
@@ -416,6 +417,7 @@ let componentParams = {
                                     columntitles[titleIdx+idx] || 
                                     `${field.label || field.propertyname} - ${field.options[optionKey] || optionKey}`,
                                 checkboxfield: field.propertyname,
+                                render: this.renderCell({addLink,idx:titleIdx+idx}),
                                 checkboxkey: optionKey,
                                 footer: '',
                                 visible
@@ -429,7 +431,7 @@ let componentParams = {
                             class: className,
                             data: field.propertyname,
                             title: columntitles[field.propertyname] || columntitles[titleIdx] || field.label || field.propertyname,
-                            render: this.renderCell({addLink}),
+                            render: this.renderCell({addLink,idx:titleIdx}),
                             footer: '',
                             visible
                         },
@@ -458,12 +460,22 @@ let componentParams = {
                 listOfResolveReject.forEach(({resolve})=>resolve(name in this ? this[name] : null))
             }
         },
-        renderCell({fieldtype='',addLink=false}){
-            const template = this.getTemplateFromSlot('rendercell',{anchorData:'anchorData',fieldtype,addLink,entryId:'entryIdAnchor',url:'anchorUrl'})
+        renderCell({fieldtype='',addLink=false,idx=-1}){
             return (data,type,row)=>{
+                const template = this.getTemplateFromSlot('rendercell',{
+                    anchorData:'anchorData',
+                    fieldtype,
+                    addLink,
+                    entryId:'entryIdAnchor',
+                    url:'anchorUrl',
+                    color: (idx === 0 && row.color.length > 0) ? 'lightslategray' : '',
+                    icon: (idx === 0 && row.icon.length > 0) ? 'iconAnchor' : ''
+                })
                 return template.replace(/anchorData/g,data.replace(/\n/g,'<br/>'))
                   .replace(/entryIdAnchor/g,row.id_fiche)
                   .replace(/anchorUrl/g,row.url)
+                  .replace(/lightslategray/g,row.color)
+                  .replace(/iconAnchor/g,row.icon)
             }
         },
         async sanitizedParamAsync(name){

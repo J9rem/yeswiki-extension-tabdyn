@@ -112,7 +112,13 @@
     <template #modifiydatetranslate>{{ _t('BAZ_DATE_MAJ') }}</template>
     <template #ownertranslate>{{ _t('TEMPLATE_OWNER') }}</template>
     <template #sumtranslate>{{ _t('SUM') }}</template>
-    <template #rendercell="{anchorData,fieldtype,addLink,entryId,url}">
+    <template #rendercell="{anchorData,fieldtype,addLink,entryId,url,color='',icon=''}">
+      <template v-if="color.length > 0">
+        <span class="pellet" :style="{backgroundColor:`${color}`}"></span>
+      </template>
+      <template v-if="icon.length > 0">
+        <i :class="{[icon]:true}"></i>
+      </template>
       {#- supported fieldtype empty,url -#}
       <template v-if="addLink">
         <a :href="url" v-html="anchorData" class="modalbox" data-size="modal-lg"></a>
