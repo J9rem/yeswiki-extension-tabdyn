@@ -116,6 +116,7 @@
     <template #ownertranslate>{{ _t('TEMPLATE_OWNER') }}</template>
     <template #sumtranslate>{{ _t('SUM') }}</template>
     <template #rendercell="{anchorData,fieldtype,fieldName,addLink,entryId,url,color='',icon=''}">
+      {# be careful, here a twig template create a VueJs template that is used to create a Datatable template #}
       <template v-if="color.length > 0">
         <span class="pellet" :style="{backgroundColor:`${color}`}"></span>
       </template>
