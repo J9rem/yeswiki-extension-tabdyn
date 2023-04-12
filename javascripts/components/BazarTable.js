@@ -426,12 +426,14 @@ let componentParams = {
                         })
                     })
                 } else {
+                    const fieldtype = ['link','email','image'].includes(field.type) ? field.type: ''
+                    const fieldName = fieldtype === 'image' ? field.propertyname : ''
                     data.columns.push({
                         ...{
                             class: className,
                             data: field.propertyname,
                             title: columntitles[field.propertyname] || columntitles[titleIdx] || field.label || field.propertyname,
-                            render: this.renderCell({addLink,idx:titleIdx}),
+                            render: this.renderCell({fieldtype,addLink,idx:titleIdx,fieldName}),
                             footer: '',
                             visible
                         },
@@ -460,13 +462,59 @@ let componentParams = {
                 listOfResolveReject.forEach(({resolve})=>resolve(name in this ? this[name] : null))
             }
         },
-        renderCell({fieldtype='',addLink=false,idx=-1}){
+        renderCell({fieldtype='',fieldName='',addLink=false,idx=-1}){
             return (data,type,row)=>{
+                let anchorData = 'anchorData'
+                let anchorImageSpecificPart = ''
+                let anchorImageOther = ''
+                let anchorImageExt = ''
+                let anchorOtherEntryId = ''
+                if (fieldtype === 'image'){
+                    if(data.length > 0){
+                        let regExp = new RegExp(`^(${row.id_fiche}_${fieldName}_)(.*)_(\\d{14})_(\\d{14})\\.([^.]+)$`)
+                        if (regExp.test(data)) {
+                            let anchorImageDate1 = ''
+                            let anchorImageDate2 = '';
+                            [,,anchorImageSpecificPart,anchorImageDate1,anchorImageDate2,anchorImageExt] = data.match(regExp)
+                            anchorImageOther = `${anchorImageDate1}_${anchorImageDate2}`
+                            anchorData = 'entryIdAnchor_fieldNameAnchor_anchorImageSpecificPart_anchorImageOther.anchorImageExt'
+                        } else {
+                            regExp = new RegExp(`^(${row.id_fiche}_${fieldName}_)(.*)\\.([^.]+)$`)
+                            if (regExp.test(data)) {
+                                [,,anchorImageSpecificPart,anchorImageExt] = data.match(regExp)
+                                anchorData = 'entryIdAnchor_fieldNameAnchor_anchorImageSpecificPart.anchorImageExt'
+                            } else {
+                                // maybe from other entry
+                                regExp = new RegExp(`^([A-Za-z0-9-_]+)(_${fieldName}_)(.*)_(\\d{14})_(\\d{14})\\.([^.]+)$`)
+                                if (regExp.test(data)) {
+                                    let anchorImageDate1 = ''
+                                    let anchorImageDate2 = '';
+                                    [,anchorOtherEntryId,,anchorImageSpecificPart,anchorImageDate1,anchorImageDate2,anchorImageExt] = data.match(regExp)
+                                    anchorImageOther = `${anchorImageDate1}_${anchorImageDate2}`
+                                    anchorData = 'anchorOtherEntryId_fieldNameAnchor_anchorImageSpecificPart_anchorImageOther.anchorImageExt'
+                                } else {
+                                    // last possible format
+                                    regExp = new RegExp('^(.*)\\.([^.]+)$')
+                                    if (regExp.test(data)) {
+                                        [,anchorImageSpecificPart,anchorImageExt] = data.match(regExp)
+                                        anchorData = 'anchorImageSpecificPart.anchorImageExt'
+                                    } else {
+                                        anchorImageSpecificPart = data
+                                        anchorData = 'anchorImageSpecificPart'
+                                    }
+                                }
+                            }                            
+                        }
+                    } else {
+                        anchorData = ''
+                    }
+                }
                 const template = this.getTemplateFromSlot('rendercell',{
-                    anchorData:'anchorData',
+                    anchorData,
                     fieldtype,
                     addLink,
                     entryId:'entryIdAnchor',
+                    fieldName, 
                     url:'anchorUrl',
                     color: (idx === 0 && row.color.length > 0) ? 'lightslategray' : '',
                     icon: (idx === 0 && row.icon.length > 0) ? 'iconAnchor' : ''
@@ -476,6 +524,11 @@ let componentParams = {
                   .replace(/anchorUrl/g,row.url)
                   .replace(/lightslategray/g,row.color)
                   .replace(/iconAnchor/g,row.icon)
+                  .replace(/fieldNameAnchor/g,fieldName)
+                  .replace(/anchorImageSpecificPart/g,anchorImageSpecificPart)
+                  .replace(/anchorImageOther/g,anchorImageOther)
+                  .replace(/anchorImageExt/g,anchorImageExt)
+                  .replace(/anchorOtherEntryId/g,anchorOtherEntryId)
             }
         },
         async sanitizedParamAsync(name){
@@ -625,6 +678,7 @@ let componentParams = {
           return false;
         });
         this.updateFieldsFromRoot()
+        window.urlImageResizedOnError = this.$root.urlImageResizedOnError
     },
     watch: {
         entries(newVal, oldVal) {

@@ -33,6 +33,9 @@
 {% endblock %}
 
 {% block display_entries %}
+  {% set imWidth = 150 %}
+  {% set imHeight = 100 %}
+  {% set firstTokenCrop = csrfToken("GET api/images/cache/#{imWidth}/#{imHeight}/crop") %}
   <Bazar-Table :params="params" :entries="entriesToDisplay" :ready="ready" :root="$root" isadmin="{{ hasAcl("@admins")|json_encode }}">
     <template #header="{displayedEntries,BazarTable}"></template>
     <template #spinnerloader="{displayedEntries,BazarTable}">
@@ -112,19 +115,29 @@
     <template #modifiydatetranslate>{{ _t('BAZ_DATE_MAJ') }}</template>
     <template #ownertranslate>{{ _t('TEMPLATE_OWNER') }}</template>
     <template #sumtranslate>{{ _t('SUM') }}</template>
-    <template #rendercell="{anchorData,fieldtype,addLink,entryId,url,color='',icon=''}">
+    <template #rendercell="{anchorData,fieldtype,fieldName,addLink,entryId,url,color='',icon=''}">
       <template v-if="color.length > 0">
         <span class="pellet" :style="{backgroundColor:`${color}`}"></span>
       </template>
       <template v-if="icon.length > 0">
         <i :class="{[icon]:true}"></i>
       </template>
-      {#- supported fieldtype empty,url -#}
+      {#- supported fieldtype empty,link,email,image -#}
       <template v-if="addLink">
         <a :href="url" v-html="anchorData" class="modalbox" data-size="modal-lg"></a>
       </template>
-      <template v-else-if="fieldtype === 'url'">
-        <a :href="anchorData" v-html="anchorData" class="new-window"></a>
+      <template v-else-if="fieldtype === 'link'">
+        <a :href="anchorData" v-html="anchorData" class="modalbox" data-size="modal-lg" data-iframe="1"></a>
+      </template>
+      <template v-else-if="fieldtype === 'email' && anchorData.length > 0">
+        <a :href="`mailto:${anchorData}`" v-html="anchorData"></a>
+      </template>
+      <template v-else-if="fieldtype === 'image' && anchorData.length > 0">
+        <img
+          loading="lazy"
+          :src="urlImage({id_fiche:entryId,url:wiki.url(entryId),[fieldName]:anchorData},fieldName,{{ imWidth }},{{ imHeight }},'crop')"
+          :onError="`urlImageResizedOnError({id_fiche:'${entryId}',url:'${wiki.url(entryId)}',['${fieldName}']:'${anchorData}'},'${fieldName}',{{ imWidth }},{{ imHeight }},'crop','{{ firstTokenCrop|e('html') }}')`">
+        </img>
       </template>
       <template v-else>
         {{-'{{anchorData}}'-}}
