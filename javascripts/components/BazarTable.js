@@ -32,7 +32,7 @@ let componentParams = {
     },
     methods:{
         addRows(dataTable,columns,entries,currentusername,isadmin){
-            const entriesToAdd = entries.filter((entry)=>!(entry.id_fiche in this.displayedEntries))
+            const entriesToAdd = entries.filter((entry)=>typeof entry === 'object' && 'id_fiche' in entry && !(entry.id_fiche in this.displayedEntries))
             let formattedDataList = []
             entriesToAdd.forEach((entry)=>{
                 this.displayedEntries[entry.id_fiche] = entry
@@ -47,7 +47,7 @@ let componentParams = {
                     } else if (['==adminsbuttons=='].includes(col.data)) {
                         formattedData[col.data] = ''
                     } else if ('firstlevel' in col && typeof col.firstlevel === 'string' && col.firstlevel.length > 0){
-                        formattedData[col.data] = (col.firstlevel in entry && col.data in entry[col.firstlevel]) ? entry[col.firstlevel][col.data] : ''
+                        formattedData[col.data] = (col.firstlevel in entry && (typeof entry[col.firstlevel] === 'object') && entry[col.firstlevel] !== null && col.data in entry[col.firstlevel]) ? entry[col.firstlevel][col.data] : ''
                     } else if ('checkboxfield' in col && typeof col.checkboxfield === 'string' && col.checkboxfield.length > 0){
                         formattedData[col.data] = (col.checkboxfield in entry && 'checkboxkey' in col && entry[col.checkboxfield].split(',').includes(col.checkboxkey)) ? 'X' : ''
                     } else if ('displayValOptions' in col){
