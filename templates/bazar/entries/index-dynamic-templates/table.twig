@@ -137,8 +137,7 @@
         <img
           loading="lazy"
           :src="urlImage({id_fiche:entryId,url:wiki.url(entryId),[fieldName]:anchorData},fieldName,{{ imWidth }},{{ imHeight }},'crop')"
-          :onError="`urlImageResizedOnError({id_fiche:'${entryId}',url:'${wiki.url(entryId)}',['${fieldName}']:'${anchorData}'},'${fieldName}',{{ imWidth }},{{ imHeight }},'crop','{{ firstTokenCrop|e('html') }}')`">
-        </img>
+          :onError="`urlImageResizedOnError({id_fiche:'${entryId}',url:'${wiki.url(entryId)}',['${fieldName}']:'${anchorData}'},'${fieldName}',{{ imWidth }},{{ imHeight }},'crop','{{ firstTokenCrop|e('html') }}')`"/>
       </template>
       <template v-else>
         {{-'{{anchorData}}'-}}
