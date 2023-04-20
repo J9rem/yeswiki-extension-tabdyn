@@ -11,7 +11,10 @@
 
 namespace YesWiki\Tabdyn;
 
+use Throwable;
+use YesWiki\Bazar\Controller\EntryController;
 use YesWiki\Bazar\Service\FormManager;
+use YesWiki\Core\Service\Performer;
 use YesWiki\Core\YesWikiAction;
 use YesWiki\Core\Controller\AuthController;
 
@@ -23,7 +26,7 @@ class __BazarListeAction extends YesWikiAction
         if (
                 !empty($arg['template']) &&
                 (
-                    in_array($arg['template'],['table','table.twig']) || 
+                    in_array($arg['template'],['map-and-table','table','table.twig']) || 
                     (
                         in_array($arg['template'],['tableau','tableau.tpl.html']) &&
                         !empty($arg['dynamic']) && 
@@ -33,7 +36,34 @@ class __BazarListeAction extends YesWikiAction
             ) {
             $newArg['dynamic'] = true;
             $newArg['pagination'] = -1;
-            $newArg['template'] = 'table';
+            if ($arg['template'] != 'map-and-table'){
+                $newArg['template'] = 'table';
+            } else {
+                try {
+                    $vars = array_slice($arg,0);
+                    $output = '';
+                    $bazarCartoAction = $this->getService(Performer::class)->createPerformable([
+                        'filePath' => 'tools/bazar/actions/BazarCartoAction.php',
+                        'baseName' => 'BazarCartoAction'
+                    ],
+                    $vars,
+                    $output);
+                    $newArg = array_merge($newArg,$bazarCartoAction->formatArguments(array_merge(['dynamic'=>true],$arg)));
+                    $newArg['template'] = 'map-and-table';
+                    if (empty($arg['tablewith']) || $arg['tablewith'] !== 'only-geolocation'){
+                        // Filters entries via query to remove whose withou bf_latitude nor bf_longitude
+                        $query = $this->getService(EntryController::class)->formatQuery($newArg, $_GET);
+                        foreach (['bf_latitude!','bf_longitude!'] as $key) {
+                            if (array_key_exists($key,$query) && empty($query[$key])){
+                                $query[$key] = 'not-empty-value-not-to-be-caugth';
+                            }
+                        }
+                        $newArg['query'] = $query;
+                    }
+                } catch (Throwable $th) {
+                    // do nothing
+                }
+            }
             $currentUser = $this->getService(AuthController::class)->getLoggedUser();
             $currentUserName= empty($currentUser['name']) ? '' : $currentUser['name'];
             $newArg['currentusername'] = $currentUserName;

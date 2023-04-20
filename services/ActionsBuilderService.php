@@ -59,6 +59,44 @@ trait ActionsBuilderServiceCommon
                     $this->data['action_groups']['bazarliste']['actions']['commons']['properties']['dynamic']['showOnlyFor'][] = 'bazartableau';
                 }
             }
+
+            // map-and-table
+            
+            if (isset($this->data['action_groups']['bazarliste']['actions'])) {
+                if (!isset($this->data['action_groups']['bazarliste']['actions']['bazarmapandtable'])) {
+                    $template = $this->data['action_groups']['bazarliste']['actions']['bazarcarto'] ?? [];
+                    $bazartableautemplate = $this->data['action_groups']['bazarliste']['actions']['bazartableau'] ?? [];
+                    $template['label'] = _t('TABDYN_AB_BAZAR_MAP_AND_TABLE_LABEL');
+                    $template['properties'] = $template['properties'] ?? [];
+                    $template['properties']['template']['value'] = 'map-and-table';
+                    if (!empty($bazartableautemplate['properties'])){
+                        foreach($bazartableautemplate['properties'] as $key => $value){
+                            if ($key != 'template'){
+                                $template['properties'][$key] = $value;
+                            }
+                        }
+                    }
+                    $template['properties']['tablewith'] = [
+                        'type' => 'list',
+                        'label' => _t('TABDYN_AB_BAZAR_MAP_AND_TABLE_TABLEWITH_LABEL'),
+                        'default' => '',
+                        'options' => [
+                            '' => _t('TABDYN_AB_BAZAR_MAP_AND_TABLE_TABLEWITH_ALL'),
+                            'only-geolocation' => _t('TABDYN_AB_BAZAR_MAP_AND_TABLE_TABLEWITH_ONLY_GEOLOC'),
+                            'no-geolocation' => _t('TABDYN_AB_BAZAR_MAP_AND_TABLE_TABLEWITH_NO_GEOLOC')
+                        ]
+                    ];
+                    $this->data['action_groups']['bazarliste']['actions']['bazarmapandtable'] = $template;
+                }
+                if (isset($this->data['action_groups']['bazarliste']['actions']['commons']['properties'])){
+                    foreach($this->data['action_groups']['bazarliste']['actions']['commons']['properties'] as $key => $data){
+                        if (!empty($data['showOnlyFor']) && is_array($data['showOnlyFor']) && 
+                            in_array('bazarcarto',$data['showOnlyFor']) && !in_array('bazarmapandtable',$data['showOnlyFor'])){
+                            $this->data['action_groups']['bazarliste']['actions']['commons']['properties'][$key]['showOnlyFor'][] = 'bazarmapandtable';
+                        }
+                    }
+                }
+            }
         }
         return $this->data;
     }
