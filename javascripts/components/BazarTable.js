@@ -47,16 +47,26 @@ let componentParams = {
                     } else if (['==adminsbuttons=='].includes(col.data)) {
                         formattedData[col.data] = ''
                     } else if ('firstlevel' in col && typeof col.firstlevel === 'string' && col.firstlevel.length > 0){
-                        formattedData[col.data] = (col.firstlevel in entry && (typeof entry[col.firstlevel] === 'object') && entry[col.firstlevel] !== null && col.data in entry[col.firstlevel]) ? entry[col.firstlevel][col.data] : ''
+                        formattedData[col.data] = (
+                            col.firstlevel in entry && 
+                            (typeof entry[col.firstlevel] === 'object') &&
+                            entry[col.firstlevel] !== null && 
+                            col.data in entry[col.firstlevel]
+                        ) ? entry[col.firstlevel][col.data] : ''
                     } else if ('checkboxfield' in col && typeof col.checkboxfield === 'string' && col.checkboxfield.length > 0){
-                        formattedData[col.data] = (col.checkboxfield in entry && 'checkboxkey' in col && entry[col.checkboxfield].split(',').includes(col.checkboxkey)) ? 'X' : ''
+                        formattedData[col.data] = (
+                            col.checkboxfield in entry &&
+                            'checkboxkey' in col &&
+                            typeof entry[col.checkboxfield] === 'string'
+                            && entry[col.checkboxfield].split(',').includes(col.checkboxkey)
+                        ) ? 'X' : ''
                     } else if ('displayValOptions' in col){
-                        formattedData[col.data] = col.data in entry ? {
+                        formattedData[col.data] = (col.data in entry && typeof entry[col.data] === 'string') ? {
                             display:entry[col.data].split(',').map((v)=>v in col.displayValOptions ? col.displayValOptions[v] : v).join(",\n"),
                             export: entry[col.data].split(',').map((v)=>v in col.displayValOptions ? `"${col.displayValOptions[v]}"` : v).join(',')
                         } : ''
                     } else {
-                        formattedData[col.data] = col.data in entry ? entry[col.data] : ''
+                        formattedData[col.data] = (col.data in entry && typeof entry[col.data] === 'string' ) ? entry[col.data] : ''
                     }
                 });
                 ['id_fiche','color','icon','url'].forEach((key)=>{
@@ -340,21 +350,24 @@ let componentParams = {
             return this.uuid
         },
         initFooter(columns,sumfieldsids){
-            const footer = $('<tr>')
-            let displayTotal = sumfieldsids.length > 0
-            columns.forEach((col)=>{
-                if ('footer' in col && col.footer.length > 0){
-                    const element = $(col.footer)
-                    const isTh = $(element).prop('tagName') === 'TH'
-                    footer.append(isTh ? element : $('<th>').append(element))
-                } else if (displayTotal) {
-                    displayTotal = false
-                    footer.append($('<th>').text(this.getTemplateFromSlot('sumtranslate',{})))
-                } else {
-                    footer.append($('<th>'))
-                }
-            })
-            this.dataTable.footer().to$().html(footer)
+            const footerNode = this.dataTable.footer().to$()
+            if (footerNode[0] !== null){
+                const footer = $('<tr>')
+                let displayTotal = sumfieldsids.length > 0
+                columns.forEach((col)=>{
+                    if ('footer' in col && col.footer.length > 0){
+                        const element = $(col.footer)
+                        const isTh = $(element).prop('tagName') === 'TH'
+                        footer.append(isTh ? element : $('<th>').append(element))
+                    } else if (displayTotal) {
+                        displayTotal = false
+                        footer.append($('<th>').text(this.getTemplateFromSlot('sumtranslate',{})))
+                    } else {
+                        footer.append($('<th>'))
+                    }
+                })
+                footerNode.html(footer)
+            }
         },
         manageError(error){
             if (wiki.isDebugEnabled){
@@ -480,7 +493,7 @@ let componentParams = {
                 if (type === 'sort' || type === 'filter'){
                     return (typeof data === 'object' && 'export' in data) ? data.export : data
                 }
-                const formattedData = (typeof data === 'object' && 'display' in data) ? data.display : data
+                const formattedData = (typeof data === 'object' && data !== null && 'display' in data) ? data.display : (data === null ? '' : String(data))
                 let anchorData = 'anchorData'
                 let anchorImageSpecificPart = ''
                 let anchorImageOther = ''
@@ -697,10 +710,11 @@ let componentParams = {
     watch: {
         entries(newVal, oldVal) {
             this.updateFieldsFromRoot() // because updated in same time than entries (but not reactive)
-            const newIds = newVal.map((e) => e.id_fiche)
-            const oldIds = oldVal.map((e) => e.id_fiche)
+            const sanitizedNewVal = newVal.filter((e)=>(typeof e === 'object' && e !== null && 'id_fiche' in e))
+            const newIds = sanitizedNewVal.map((e) => e.id_fiche)
+            const oldIds = oldVal.map((e) => e.id_fiche || '').filter((e)=>(typeof e === 'string' && e.length > 0))
             if (!this.arraysEqual(newIds, oldIds)) {
-                this.updateEntries(newVal,newIds).catch(this.manageError)
+                this.updateEntries(sanitizedNewVal,newIds).catch(this.manageError)
             }
         },
         params() {
