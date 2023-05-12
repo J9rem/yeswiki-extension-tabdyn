@@ -54,6 +54,14 @@ trait ActionsBuilderServiceCommon
                 $this->data = $this->previousData;
             }
             
+            if (isset($this->data['action_groups']['bazarliste']['actions']['bazartableau']['properties']['columnfieldsids'])) {
+                $this->data['action_groups']['bazarliste']['actions']['bazartableau']['properties']['columnfieldsids']['extraFields'] = [
+                    'id_typeannonce',
+                    'date_creation_fiche',
+                    'date_maj_fiche'
+                ];
+            }
+
             if (isset($this->data['action_groups']['bazarliste']['actions']['commons']['properties']['dynamic']['showOnlyFor'])) {
                 if (!in_array('bazartableau',$this->data['action_groups']['bazarliste']['actions']['commons']['properties']['dynamic']['showOnlyFor'])){
                     $this->data['action_groups']['bazarliste']['actions']['commons']['properties']['dynamic']['showOnlyFor'][] = 'bazartableau';
