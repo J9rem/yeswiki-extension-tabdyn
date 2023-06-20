@@ -36,6 +36,7 @@
   {% set imWidth = 150 %}
   {% set imHeight = 100 %}
   {% set firstTokenCrop = csrfToken("GET api/images/cache/#{imWidth}/#{imHeight}/crop") %}
+  {# be careful to use POST if needed #}
   <Bazar-Table :params="params" :entries="entriesToDisplay" :ready="ready" :root="$root" isadmin="{{ hasAcl("@admins")|json_encode }}">
     <template #header="{displayedEntries,BazarTable}"></template>
     <template #spinnerloader="{displayedEntries,BazarTable}">

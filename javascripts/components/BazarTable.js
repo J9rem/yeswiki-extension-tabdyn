@@ -102,22 +102,24 @@ let componentParams = {
         deleteAllSelected(event){
             const uuid = this.getUuid()
             multiDeleteService.updateNbSelected(`MultiDeleteModal${uuid}`)
-            const entriesIdsToRefreshDeleteToken = []
-            $(`#${uuid}`).find('tr > td:first-child input.selectline[type=checkbox]:visible:checked').each(function (){
-                const csrfToken = $(this).data('csrftoken')
-                const itemId = $(this).data('itemid')
-                if (typeof itemId === 'string' && itemId.length > 0 && (typeof csrfToken !== 'string' || csrfToken === 'to-be-defined')){
-                    entriesIdsToRefreshDeleteToken.push({elem:$(this),itemId})
-                }
-            })
-            if (entriesIdsToRefreshDeleteToken.length > 0){
-                this.getCsrfDeleteTokens(entriesIdsToRefreshDeleteToken.map((e)=>e.itemId))
-                    .then((tokens)=>{
-                        entriesIdsToRefreshDeleteToken.forEach(({elem,itemId})=>{
-                            $(elem).data('csrftoken',tokens[itemId] || 'error')
+            if (!('antiCsrfToken' in wiki) || wiki.antiCsrfToken.length == 0){
+                const entriesIdsToRefreshDeleteToken = []
+                $(`#${uuid}`).find('tr > td:first-child input.selectline[type=checkbox]:visible:checked').each(function (){
+                    const csrfToken = $(this).data('csrftoken')
+                    const itemId = $(this).data('itemid')
+                    if (typeof itemId === 'string' && itemId.length > 0 && (typeof csrfToken !== 'string' || csrfToken === 'to-be-defined')){
+                        entriesIdsToRefreshDeleteToken.push({elem:$(this),itemId})
+                    }
+                })
+                if (entriesIdsToRefreshDeleteToken.length > 0){
+                    this.getCsrfDeleteTokens(entriesIdsToRefreshDeleteToken.map((e)=>e.itemId))
+                        .then((tokens)=>{
+                            entriesIdsToRefreshDeleteToken.forEach(({elem,itemId})=>{
+                                $(elem).data('csrftoken',tokens[itemId] || 'error')
+                            })
                         })
-                    })
-                    .catch(this.manageError)
+                        .catch(this.manageError)
+                }
             }
             // if something to do before showing modal (like get csrf token ?)
         },
